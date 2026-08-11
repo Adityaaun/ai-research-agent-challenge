@@ -14,7 +14,7 @@ The agent is intentionally simple: local ChromaDB handles semantic retrieval and
 - **Custom questions:** Reviewers can pass any question through the CLI.
 - **Hallucination test:** An out-of-scope question demonstrates the required refusal behavior.
 - **Local embeddings:** ChromaDB uses its local default embedding function, so no separate embedding API key is required.
-- **Gemini synthesis:** Uses `gemini-3.6-flash` by default.
+- **Gemini synthesis:** Uses the configurable `GEMINI_MODEL` setting, defaulting to `gemini-3.6-flash`.
 
 ## 🧱 Architecture
 
@@ -89,7 +89,7 @@ Copy `.env.example` to `.env` and replace the placeholder:
 GEMINI_API_KEY=your_actual_key_here
 ```
 
-The agent defaults to the stable `gemini-3.6-flash` model. You can override the model with:
+The agent defaults to `gemini-3.6-flash`. You can override the model with:
 
 ```text
 GEMINI_MODEL=gemini-3.6-flash
@@ -102,19 +102,21 @@ GEMINI_MODEL=gemini-3.6-flash
 From the repository root, run the complete three-question demonstration:
 
 ```bash
-python src/agent.py
+python -u src/agent.py
 ```
+
+The `-u` flag keeps terminal output unbuffered so the complete demonstration is displayed immediately.
 
 To ask a custom question using the supplied sources:
 
 ```bash
-python src/agent.py --question "What is a qubit?"
+python -u src/agent.py --question "What is a qubit?"
 ```
 
 To use a different directory containing `.txt` source documents:
 
 ```bash
-python src/agent.py --question "What does this source say about X?" --data-dir ./my_sources
+python -u src/agent.py --question "What does this source say about X?" --data-dir ./my_sources
 ```
 
 ## 🧪 Tests
@@ -163,7 +165,7 @@ This is deliberately lightweight for a 24-hour challenge. It avoids adding a sep
 - **Why filename citations?** They are easy for a reviewer to verify against the supplied source documents. The application also validates that cited filenames were actually retrieved.
 - **Current scope:** The loader supports `.txt` files only. PDF extraction, web search, reranking, and conversational memory are intentionally outside the challenge scope.
 - **Refusal behavior:** If the retrieved evidence is insufficient, the model is instructed to return the exact source-not-found message. Because this is LLM-based, the project keeps the retrieved context explicit and validates citations to reduce unsupported claims.
-- **Model/API note:** The implementation uses Gemini's `generateContent` REST endpoint. The model is configurable through `GEMINI_MODEL` and defaults to the stable `gemini-3.6-flash` model.
+- **Model/API note:** The implementation calls Gemini's `generateContent` REST endpoint directly. The model is configurable through `GEMINI_MODEL` and defaults to `gemini-3.6-flash`.
 
 ## 📌 Reproducibility
 
