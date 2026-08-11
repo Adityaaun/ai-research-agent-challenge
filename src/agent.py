@@ -198,7 +198,6 @@ USER QUESTION: {query}
 
 def run_demo() -> None:
     """Run the three challenge questions."""
-    load_documents()
     questions = [
         "What is the fundamental unit of information in a quantum computer, and what special state allows it to perform simultaneous calculations?",
         "Which rover is currently searching for signs of ancient life on Mars, and where did it land?",
