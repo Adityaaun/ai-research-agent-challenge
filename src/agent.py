@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import glob
 import hashlib
 import os
@@ -11,8 +12,6 @@ import chromadb
 from dotenv import load_dotenv
 from google import genai
 
-# Resolve paths from this file so the project works regardless of the current
-# working directory.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 CHROMA_DIR = PROJECT_ROOT / "chroma_db"
@@ -20,6 +19,7 @@ COLLECTION_NAME = "research_docs"
 MODEL_NAME = "gemini-3.5-flash"
 MAX_RESULTS = 4
 MAX_CHUNK_WORDS = 220
+REFUSAL = "The provided sources do not contain the answer to this question."
 
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -84,8 +84,6 @@ def load_documents(data_dir: str | Path = DATA_DIR):
     if not file_paths:
         raise FileNotFoundError(f"No .txt source documents found in {data_path}")
 
-    # Rebuild the small challenge collection on every run so deleted/changed
-    # source files cannot leave stale embeddings behind.
     try:
         chroma_client.delete_collection(name=COLLECTION_NAME)
     except ValueError:
@@ -101,12 +99,7 @@ def load_documents(data_dir: str | Path = DATA_DIR):
         content = path.read_text(encoding="utf-8").strip()
         for chunk_index, chunk in enumerate(chunk_text(content)):
             documents.append(chunk)
-            metadatas.append(
-                {
-                    "source": path.name,
-                    "chunk_index": chunk_index,
-                }
-            )
+            metadatas.append({"source": path.name, "chunk_index": chunk_index})
             ids.append(_stable_id(path.name, chunk_index))
 
     collection.add(documents=documents, metadatas=metadatas, ids=ids)
@@ -130,17 +123,13 @@ def retrieve(query: str, n_results: int = MAX_RESULTS) -> list[dict[str, Any]]:
     distances = result.get("distances", [[]])[0]
 
     return [
-        {
-            "document": document,
-            "metadata": metadata or {},
-            "distance": distance,
-        }
+        {"document": document, "metadata": metadata or {}, "distance": distance}
         for document, metadata, distance in zip(documents, metadatas, distances)
     ]
 
 
 def build_context(retrieved: list[dict[str, Any]]) -> str:
-    """Format retrieved passages with explicit source IDs for citation grounding."""
+    """Format retrieved passages with explicit source boundaries."""
     sections: list[str] = []
     for index, item in enumerate(retrieved, start=1):
         source = item["metadata"].get("source", "unknown")
@@ -154,14 +143,14 @@ def build_context(retrieved: list[dict[str, Any]]) -> str:
 
 
 def validate_citations(answer: str, retrieved: list[dict[str, Any]]) -> bool:
-    """Ensure every filename citation in an answer belongs to retrieved sources."""
+    """Ensure an answer has citations and every cited filename was retrieved."""
     cited_files = set(re.findall(r"\[Source:\s*([^\]]+)\]", answer))
     valid_files = {
         item["metadata"].get("source")
         for item in retrieved
         if item["metadata"].get("source")
     }
-    return cited_files.issubset(valid_files)
+    return bool(cited_files) and cited_files.issubset(valid_files)
 
 
 def ask_agent(query: str) -> str:
@@ -175,7 +164,7 @@ Answer the user's question using ONLY the source passages below.
 Rules:
 1. Do not use outside knowledge or assumptions.
 2. If the sources do not contain enough information to answer the question, reply EXACTLY:
-The provided sources do not contain the answer to this question.
+{REFUSAL}
 3. Every factual claim must end with a citation in this exact format: [Source: filename.txt]
 4. Only cite filenames that appear in the provided source passages.
 5. Do not invent source names, facts, dates, or details.
@@ -187,18 +176,21 @@ SOURCE PASSAGES:
 USER QUESTION: {query}
 """
 
-    client = get_gemini_client()
-    response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+    response = get_gemini_client().models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+    )
     answer = (response.text or "").strip()
 
     if not answer:
         raise RuntimeError("Gemini returned an empty response.")
 
-    if not answer.startswith("The provided sources do not contain the answer") and not validate_citations(
-        answer, retrieved
-    ):
+    if answer == REFUSAL:
+        return answer
+
+    if not validate_citations(answer, retrieved):
         raise RuntimeError(
-            "Gemini returned a citation that was not present in the retrieved sources."
+            "Gemini returned an answer without valid citations from the retrieved sources."
         )
 
     return answer
@@ -207,7 +199,6 @@ USER QUESTION: {query}
 def run_demo() -> None:
     """Run the three challenge questions."""
     load_documents()
-
     questions = [
         "What is the fundamental unit of information in a quantum computer, and what special state allows it to perform simultaneous calculations?",
         "Which rover is currently searching for signs of ancient life on Mars, and where did it land?",
@@ -217,7 +208,6 @@ def run_demo() -> None:
     print("\n" + "=" * 70)
     print("Research Agent (with Citations)")
     print("=" * 70)
-
     for question in questions:
         print(f"\n[Question] {question}")
         print("[Answer]")
@@ -225,5 +215,20 @@ def run_demo() -> None:
         print("-" * 70)
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Research Agent with source citations")
+    parser.add_argument(
+        "--question",
+        help="Ask a custom question using only the provided source documents.",
+    )
+    args = parser.parse_args()
+
+    load_documents()
+    if args.question:
+        print(ask_agent(args.question))
+    else:
+        run_demo()
+
+
 if __name__ == "__main__":
-    run_demo()
+    main()
