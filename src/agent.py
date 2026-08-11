@@ -23,19 +23,22 @@ REFUSAL = "The provided sources do not contain the answer to this question."
 
 load_dotenv(PROJECT_ROOT / ".env")
 
-# Chroma uses its local default embedding function (all-MiniLM-L6-v2).
 chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME)
+_gemini_client: genai.Client | None = None
 
 
 def get_gemini_client() -> genai.Client:
-    """Create the Gemini client only when an answer is requested."""
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key or api_key == "your_gemini_api_key_here":
-        raise ValueError(
-            "Valid GEMINI_API_KEY not found. Copy .env.example to .env and add your API key."
-        )
-    return genai.Client(api_key=api_key)
+    """Return one reusable Gemini client for the lifetime of the process."""
+    global _gemini_client
+    if _gemini_client is None:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key or api_key == "your_gemini_api_key_here":
+            raise ValueError(
+                "Valid GEMINI_API_KEY not found. Copy .env.example to .env and add your API key."
+            )
+        _gemini_client = genai.Client(api_key=api_key)
+    return _gemini_client
 
 
 def chunk_text(text: str, max_words: int = MAX_CHUNK_WORDS) -> list[str]:
@@ -44,29 +47,22 @@ def chunk_text(text: str, max_words: int = MAX_CHUNK_WORDS) -> list[str]:
     chunks: list[str] = []
     current: list[str] = []
     current_words = 0
-
     for paragraph in paragraphs:
         words = paragraph.split()
         if len(words) > max_words:
             if current:
                 chunks.append(" ".join(current))
-                current = []
-                current_words = 0
+                current, current_words = [], 0
             for start in range(0, len(words), max_words):
                 chunks.append(" ".join(words[start : start + max_words]))
             continue
-
         if current and current_words + len(words) > max_words:
             chunks.append(" ".join(current))
-            current = []
-            current_words = 0
-
+            current, current_words = [], 0
         current.append(paragraph)
         current_words += len(words)
-
     if current:
         chunks.append(" ".join(current))
-
     return chunks
 
 
@@ -80,7 +76,6 @@ def load_documents(data_dir: str | Path = DATA_DIR):
     global collection
     data_path = Path(data_dir)
     file_paths = sorted(glob.glob(str(data_path / "*.txt")))
-
     if not file_paths:
         raise FileNotFoundError(f"No .txt source documents found in {data_path}")
 
@@ -93,7 +88,6 @@ def load_documents(data_dir: str | Path = DATA_DIR):
     documents: list[str] = []
     metadatas: list[dict[str, Any]] = []
     ids: list[str] = []
-
     for file_path in file_paths:
         path = Path(file_path)
         content = path.read_text(encoding="utf-8").strip()
@@ -111,17 +105,14 @@ def retrieve(query: str, n_results: int = MAX_RESULTS) -> list[dict[str, Any]]:
     """Retrieve the most relevant source passages for a question."""
     if collection.count() == 0:
         raise RuntimeError("No documents are indexed. Run load_documents() first.")
-
     result = collection.query(
         query_texts=[query],
         n_results=min(n_results, collection.count()),
         include=["documents", "metadatas", "distances"],
     )
-
     documents = result.get("documents", [[]])[0]
     metadatas = result.get("metadatas", [[]])[0]
     distances = result.get("distances", [[]])[0]
-
     return [
         {"document": document, "metadata": metadata or {}, "distance": distance}
         for document, metadata, distance in zip(documents, metadatas, distances)
@@ -157,7 +148,6 @@ def ask_agent(query: str) -> str:
     """Retrieve source passages and synthesize a cited answer using Gemini."""
     retrieved = retrieve(query)
     context = build_context(retrieved)
-
     prompt = f"""You are a strict research assistant.
 Answer the user's question using ONLY the source passages below.
 
@@ -181,18 +171,14 @@ USER QUESTION: {query}
         contents=prompt,
     )
     answer = (response.text or "").strip()
-
     if not answer:
         raise RuntimeError("Gemini returned an empty response.")
-
     if answer == REFUSAL:
         return answer
-
     if not validate_citations(answer, retrieved):
         raise RuntimeError(
             "Gemini returned an answer without valid citations from the retrieved sources."
         )
-
     return answer
 
 
@@ -203,7 +189,6 @@ def run_demo() -> None:
         "Which rover is currently searching for signs of ancient life on Mars, and where did it land?",
         "When did the Apollo 11 mission land on the moon?",
     ]
-
     print("\n" + "=" * 70)
     print("Research Agent (with Citations)")
     print("=" * 70)
@@ -216,17 +201,9 @@ def run_demo() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Research Agent with source citations")
-    parser.add_argument(
-        "--question",
-        help="Ask a custom question using only the supplied source documents.",
-    )
-    parser.add_argument(
-        "--data-dir",
-        default=str(DATA_DIR),
-        help="Directory containing the .txt source documents (default: data).",
-    )
+    parser.add_argument("--question", help="Ask a custom question using only the supplied source documents.")
+    parser.add_argument("--data-dir", default=str(DATA_DIR), help="Directory containing the .txt source documents (default: data).")
     args = parser.parse_args()
-
     load_documents(args.data_dir)
     if args.question:
         print(ask_agent(args.question))
