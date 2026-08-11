@@ -9,7 +9,7 @@ Built in 24 hours for the ROOMAN AI CHALLENGE.
 - **Strict Citations:** The model is prompted to cite the exact filename for every claim.
 - **Hallucination Prevention:** The agent refuses to answer if the context is missing.
 - **100% Local Embeddings:** Uses `chromadb` with local sentence-transformers, meaning no API costs for document embedding.
-- **Gemini Powered:** Uses the fast and powerful `gemini-1.5-flash` model for synthesis.
+- **Gemini Powered:** Uses the fast and powerful `gemini-3.5-flash` model for synthesis.
 
 ## 🛠️ Setup Instructions (Foolproof)
 
@@ -54,6 +54,6 @@ The script will automatically read the `.txt` files in the `data/` folder, embed
 
 ## ⚖️ Tradeoff Notes & Design Choices
 - **Why ChromaDB?** I chose Chroma for this 24-hour challenge because it comes with an out-of-the-box local embedding model (`all-MiniLM-L6-v2`). This makes setup foolproof for reviewers (no extra embedding API keys required) and keeps the architecture lightweight.
-- **Why Gemini 1.5 Flash?** It is incredibly fast, offers a generous free tier, and follows strict system prompts (like citation rules) very well.
+- **Why Gemini 3.5 Flash?** It is incredibly fast, offers a generous free tier, and follows strict system prompts (like citation rules) very well.
 - **Limitations:** Currently, the document loader treats entire `.txt` files as single chunks. This is perfectly fine for short articles, but for large enterprise PDFs, I would implement a recursive character text splitter to maintain context without exceeding token limits. 
 - **What I'd do with more time:** Add a beautiful UI using Streamlit, implement PyMuPDF to extract text from complex PDFs, and add conversation history to the prompt so the user can ask follow-up questions.
