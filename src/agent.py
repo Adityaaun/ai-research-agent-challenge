@@ -18,13 +18,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 CHROMA_DIR = PROJECT_ROOT / "chroma_db"
 COLLECTION_NAME = "research_docs"
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_RESULTS = 4
 MAX_CHUNK_WORDS = 220
 REFUSAL = "The provided sources do not contain the answer to this question."
 
 load_dotenv(PROJECT_ROOT / ".env")
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME)
@@ -143,16 +142,18 @@ def generate_with_gemini(prompt: str) -> str:
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{MODEL_NAME}:generateContent?key={api_key}"
+        f"{MODEL_NAME}:generateContent"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.0},
     }
     request = Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
         method="POST",
     )
 
