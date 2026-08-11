@@ -14,7 +14,7 @@ The agent is intentionally simple: local ChromaDB handles semantic retrieval and
 - **Custom questions:** Reviewers can pass any question through the CLI.
 - **Hallucination test:** An out-of-scope question demonstrates the required refusal behavior.
 - **Local embeddings:** ChromaDB uses its local default embedding function, so no separate embedding API key is required.
-- **Gemini synthesis:** Uses `gemini-3.5-flash` for the final answer.
+- **Gemini synthesis:** Uses `gemini-3.6-flash` by default.
 
 ## 🧱 Architecture
 
@@ -89,6 +89,12 @@ Copy `.env.example` to `.env` and replace the placeholder:
 GEMINI_API_KEY=your_actual_key_here
 ```
 
+The agent defaults to the stable `gemini-3.6-flash` model. You can override the model with:
+
+```text
+GEMINI_MODEL=gemini-3.6-flash
+```
+
 **Never commit `.env` or a real API key.** `.env` is excluded by `.gitignore`.
 
 ## ▶️ Run
@@ -129,7 +135,7 @@ GitHub Actions also runs the test suite automatically on pushes and pull request
 - **Core implementation:** [`src/agent.py`](src/agent.py)
 - **Unit tests:** [`tests/test_agent.py`](tests/test_agent.py)
 - **Environment template:** [`.env.example`](.env.example)
-- **CI workflow:** [`.github/workflows/tests.yml`](.github/workflows/tests.yml)
+- **CI workflow:** [`.github/workflows/test.yml`](.github/workflows/test.yml)
 
 The three included questions test:
 
@@ -157,6 +163,7 @@ This is deliberately lightweight for a 24-hour challenge. It avoids adding a sep
 - **Why filename citations?** They are easy for a reviewer to verify against the supplied source documents. The application also validates that cited filenames were actually retrieved.
 - **Current scope:** The loader supports `.txt` files only. PDF extraction, web search, reranking, and conversational memory are intentionally outside the challenge scope.
 - **Refusal behavior:** If the retrieved evidence is insufficient, the model is instructed to return the exact source-not-found message. Because this is LLM-based, the project keeps the retrieved context explicit and validates citations to reduce unsupported claims.
+- **Model/API note:** The implementation uses Gemini's `generateContent` REST endpoint. The model is configurable through `GEMINI_MODEL` and defaults to the stable `gemini-3.6-flash` model.
 
 ## 📌 Reproducibility
 
