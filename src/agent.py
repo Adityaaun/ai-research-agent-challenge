@@ -3,42 +3,31 @@ from __future__ import annotations
 import argparse
 import glob
 import hashlib
+import json
 import os
 import re
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import chromadb
 from dotenv import load_dotenv
-from google import genai
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 CHROMA_DIR = PROJECT_ROOT / "chroma_db"
 COLLECTION_NAME = "research_docs"
-MODEL_NAME = "gemini-3.5-flash"
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_RESULTS = 4
 MAX_CHUNK_WORDS = 220
 REFUSAL = "The provided sources do not contain the answer to this question."
 
 load_dotenv(PROJECT_ROOT / ".env")
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME)
-_gemini_client: genai.Client | None = None
-
-
-def get_gemini_client() -> genai.Client:
-    """Return one reusable Gemini client for the lifetime of the process."""
-    global _gemini_client
-    if _gemini_client is None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key or api_key == "your_gemini_api_key_here":
-            raise ValueError(
-                "Valid GEMINI_API_KEY not found. Copy .env.example to .env and add your API key."
-            )
-        _gemini_client = genai.Client(api_key=api_key)
-    return _gemini_client
 
 
 def chunk_text(text: str, max_words: int = MAX_CHUNK_WORDS) -> list[str]:
@@ -144,6 +133,44 @@ def validate_citations(answer: str, retrieved: list[dict[str, Any]]) -> bool:
     return bool(cited_files) and cited_files.issubset(valid_files)
 
 
+def generate_with_gemini(prompt: str) -> str:
+    """Call the Gemini Developer API directly, avoiding SDK client lifecycle issues."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key or api_key == "your_gemini_api_key_here":
+        raise ValueError(
+            "Valid GEMINI_API_KEY not found. Copy .env.example to .env and add your API key."
+        )
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{MODEL_NAME}:generateContent?key={api_key}"
+    )
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.0},
+    }
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=90) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Gemini API request failed ({exc.code}): {detail}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"Could not reach the Gemini API: {exc.reason}") from exc
+
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"Gemini returned an unexpected response: {data}") from exc
+
+
 def ask_agent(query: str) -> str:
     """Retrieve source passages and synthesize a cited answer using Gemini."""
     retrieved = retrieve(query)
@@ -166,8 +193,7 @@ SOURCE PASSAGES:
 USER QUESTION: {query}
 """
 
-    response = get_gemini_client().models.generate_content(model=MODEL_NAME, contents=prompt)
-    answer = (response.text or "").strip()
+    answer = generate_with_gemini(prompt)
     if not answer:
         raise RuntimeError("Gemini returned an empty response.")
     if answer == REFUSAL:
