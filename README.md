@@ -9,7 +9,8 @@ The agent is intentionally simple: local ChromaDB handles semantic retrieval and
 - **RAG:** Semantic retrieval over the supplied `.txt` source documents.
 - **Passage-level retrieval:** Source files are split into small passages before indexing.
 - **Grounded citations:** The prompt requires every factual claim to cite a retrieved filename.
-- **Citation validation:** Generated filename citations are checked against the sources actually retrieved.
+- **Citation validation:** Generated filename citations are checked against the sources actually retrieved, and uncited answerable responses are rejected.
+- **Custom questions:** Reviewers can pass any question through the CLI.
 - **Hallucination test:** An out-of-scope question demonstrates the required refusal behavior.
 - **Local embeddings:** ChromaDB uses its local default embedding function, so no separate embedding API key is required.
 - **Gemini synthesis:** Uses `gemini-3.5-flash` for the final answer.
@@ -30,6 +31,9 @@ Grounded Gemini prompt
    │
    ▼
 Cited answer / source-not-found refusal
+   │
+   ▼
+Citation validation
 ```
 
 ## 🛠️ Setup
@@ -85,21 +89,37 @@ GEMINI_API_KEY=your_actual_key_here
 
 ## ▶️ Run
 
-From the repository root:
+From the repository root, run the complete three-question demonstration:
 
 ```bash
 python src/agent.py
 ```
 
-The script loads the sample documents, indexes their passages, and runs the three challenge questions in `questions.md`.
+To ask a custom question using only the supplied source documents:
+
+```bash
+python src/agent.py --question "What is a qubit?"
+```
+
+## 🧪 Tests
+
+Run the local unit tests:
+
+```bash
+python -m pytest -q
+```
+
+GitHub Actions also runs the test suite automatically on pushes and pull requests.
 
 ## 🧪 Challenge Deliverables
 
 - **Question set:** [`questions.md`](questions.md)
 - **Source documents:** [`data/`](data/)
-- **Sample cited answers:** [`sample_outputs.md`](sample_outputs.md)
+- **Sample/expected cited answers:** [`sample_outputs.md`](sample_outputs.md)
 - **Core implementation:** [`src/agent.py`](src/agent.py)
+- **Unit tests:** [`tests/test_agent.py`](tests/test_agent.py)
 - **Environment template:** [`.env.example`](.env.example)
+- **CI workflow:** [`.github/workflows/tests.yml`](.github/workflows/tests.yml)
 
 The three included questions test:
 
@@ -115,7 +135,7 @@ The three included questions test:
 4. A user question is embedded and the most relevant passages are retrieved.
 5. The retrieved passages are inserted into a strict Gemini prompt with explicit source boundaries.
 6. Gemini must answer only from those passages and cite the source filename for factual claims.
-7. The application validates that generated filename citations belong to the retrieved sources.
+7. The application validates that generated filename citations belong to the retrieved sources and rejects answerable responses that contain no valid citation.
 
 This is deliberately lightweight for a 24-hour challenge. It avoids adding a separate orchestration framework when a small Python pipeline is sufficient.
 
@@ -130,4 +150,4 @@ This is deliberately lightweight for a 24-hour challenge. It avoids adding a sep
 
 ## 📌 Reproducibility
 
-Dependencies are pinned in `requirements.txt`. The repository includes sample source documents, questions, expected behavior, and sample outputs so a reviewer can reproduce the demonstration quickly.
+Dependencies are pinned in `requirements.txt`. The repository includes sample source documents, questions, expected behavior, tests, and setup instructions so a reviewer can reproduce the demonstration quickly.
