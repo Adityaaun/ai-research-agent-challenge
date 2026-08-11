@@ -218,11 +218,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Research Agent with source citations")
     parser.add_argument(
         "--question",
-        help="Ask a custom question using only the provided source documents.",
+        help="Ask a custom question using only the supplied source documents.",
+    )
+    parser.add_argument(
+        "--data-dir",
+        default=str(DATA_DIR),
+        help="Directory containing the .txt source documents (default: data).",
     )
     args = parser.parse_args()
 
-    load_documents()
+    load_documents(args.data_dir)
     if args.question:
         print(ask_agent(args.question))
     else:
