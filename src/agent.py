@@ -1,119 +1,229 @@
-import os
+from __future__ import annotations
+
 import glob
+import hashlib
+import os
+import re
+from pathlib import Path
+from typing import Any
+
 import chromadb
-from google import genai
 from dotenv import load_dotenv
+from google import genai
 
-# Load environment variables
-load_dotenv()
+# Resolve paths from this file so the project works regardless of the current
+# working directory.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+CHROMA_DIR = PROJECT_ROOT / "chroma_db"
+COLLECTION_NAME = "research_docs"
+MODEL_NAME = "gemini-3.5-flash"
+MAX_RESULTS = 4
+MAX_CHUNK_WORDS = 220
 
-# Configure Gemini API
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key or api_key == "your_gemini_api_key_here":
-    raise ValueError("Valid GEMINI_API_KEY not found in .env file. Please add it.")
-    
-# Initialize the new Google GenAI client
-client = genai.Client(api_key=api_key)
+load_dotenv(PROJECT_ROOT / ".env")
 
-# Initialize ChromaDB (Local vector database)
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
-collection = chroma_client.get_or_create_collection(name="research_docs")
+# Chroma uses its local default embedding function (all-MiniLM-L6-v2).
+chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME)
 
-def load_documents(data_dir="data"):
-    """Reads all text files in the data directory and adds them to ChromaDB."""
+
+def get_gemini_client() -> genai.Client:
+    """Create the Gemini client only when an answer is requested."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key or api_key == "your_gemini_api_key_here":
+        raise ValueError(
+            "Valid GEMINI_API_KEY not found. Copy .env.example to .env and add your API key."
+        )
+    return genai.Client(api_key=api_key)
+
+
+def chunk_text(text: str, max_words: int = MAX_CHUNK_WORDS) -> list[str]:
+    """Split source text into small passages while preserving paragraph boundaries."""
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    chunks: list[str] = []
+    current: list[str] = []
+    current_words = 0
+
+    for paragraph in paragraphs:
+        words = paragraph.split()
+        if len(words) > max_words:
+            if current:
+                chunks.append(" ".join(current))
+                current = []
+                current_words = 0
+            for start in range(0, len(words), max_words):
+                chunks.append(" ".join(words[start : start + max_words]))
+            continue
+
+        if current and current_words + len(words) > max_words:
+            chunks.append(" ".join(current))
+            current = []
+            current_words = 0
+
+        current.append(paragraph)
+        current_words += len(words)
+
+    if current:
+        chunks.append(" ".join(current))
+
+    return chunks
+
+
+def _stable_id(filename: str, chunk_index: int) -> str:
+    digest = hashlib.sha1(f"{filename}:{chunk_index}".encode()).hexdigest()[:16]
+    return f"doc_{digest}"
+
+
+def load_documents(data_dir: str | Path = DATA_DIR):
+    """Load .txt sources into Chroma using passage-level chunks."""
     global collection
-    print(f"Loading documents from {data_dir}...")
-    
-    # Clear existing documents to avoid duplicates during testing
-    if collection.count() > 0:
-        chroma_client.delete_collection("research_docs")
-        collection = chroma_client.create_collection("research_docs")
+    data_path = Path(data_dir)
+    file_paths = sorted(glob.glob(str(data_path / "*.txt")))
 
-    documents = []
-    metadatas = []
-    ids = []
-    
-    file_paths = glob.glob(os.path.join(data_dir, "*.txt"))
     if not file_paths:
-        print("No documents found in the data directory.")
-        return collection
-        
-    for idx, file_path in enumerate(file_paths):
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            filename = os.path.basename(file_path)
-            
-            # For simplicity in this demo, each file is treated as a single chunk.
-            documents.append(content)
-            metadatas.append({"source": filename})
-            ids.append(f"doc_{idx}")
-            
-    # Add to ChromaDB. It uses a local embedding model automatically!
-    collection.add(
-        documents=documents,
-        metadatas=metadatas,
-        ids=ids
-    )
-    print(f"Successfully loaded {len(documents)} documents into the database.")
+        raise FileNotFoundError(f"No .txt source documents found in {data_path}")
+
+    # Rebuild the small challenge collection on every run so deleted/changed
+    # source files cannot leave stale embeddings behind.
+    try:
+        chroma_client.delete_collection(name=COLLECTION_NAME)
+    except ValueError:
+        pass
+    collection = chroma_client.create_collection(name=COLLECTION_NAME)
+
+    documents: list[str] = []
+    metadatas: list[dict[str, Any]] = []
+    ids: list[str] = []
+
+    for file_path in file_paths:
+        path = Path(file_path)
+        content = path.read_text(encoding="utf-8").strip()
+        for chunk_index, chunk in enumerate(chunk_text(content)):
+            documents.append(chunk)
+            metadatas.append(
+                {
+                    "source": path.name,
+                    "chunk_index": chunk_index,
+                }
+            )
+            ids.append(_stable_id(path.name, chunk_index))
+
+    collection.add(documents=documents, metadatas=metadatas, ids=ids)
+    print(f"Loaded {len(documents)} passages from {len(file_paths)} source files.")
     return collection
 
-def ask_agent(query):
-    """Retrieves relevant documents and uses Gemini to answer with citations."""
-    print(f"\n[Question]: {query}")
-    
-    # 1. Retrieve the most relevant documents using semantic search
-    results = collection.query(
+
+def retrieve(query: str, n_results: int = MAX_RESULTS) -> list[dict[str, Any]]:
+    """Retrieve the most relevant source passages for a question."""
+    if collection.count() == 0:
+        raise RuntimeError("No documents are indexed. Run load_documents() first.")
+
+    result = collection.query(
         query_texts=[query],
-        n_results=2 # Fetch top 2 most relevant chunks
+        n_results=min(n_results, collection.count()),
+        include=["documents", "metadatas", "distances"],
     )
-    
-    retrieved_docs = results['documents'][0]
-    retrieved_metadata = results['metadatas'][0]
-    
-    # 2. Format the context for the prompt
-    context = ""
-    for i in range(len(retrieved_docs)):
-        source = retrieved_metadata[i]['source']
-        text = retrieved_docs[i]
-        context += f"--- START SOURCE: {source} ---\n{text}\n--- END SOURCE ---\n\n"
-        
-    # 3. Construct the prompt with strict rules to prevent hallucination
-    prompt = f"""You are a strict and precise research assistant.
-Your job is to answer the user's question using ONLY the provided sources below.
 
-RULES:
-1. You must answer based ONLY on the provided sources. 
-2. If the sources do not contain the answer, you must reply EXACTLY with: "The provided sources do not contain the answer to this question."
-3. For every claim you make, you MUST cite the source file it came from at the end of the sentence like this: [Source: filename.txt]
+    documents = result.get("documents", [[]])[0]
+    metadatas = result.get("metadatas", [[]])[0]
+    distances = result.get("distances", [[]])[0]
 
-SOURCES:
+    return [
+        {
+            "document": document,
+            "metadata": metadata or {},
+            "distance": distance,
+        }
+        for document, metadata, distance in zip(documents, metadatas, distances)
+    ]
+
+
+def build_context(retrieved: list[dict[str, Any]]) -> str:
+    """Format retrieved passages with explicit source IDs for citation grounding."""
+    sections: list[str] = []
+    for index, item in enumerate(retrieved, start=1):
+        source = item["metadata"].get("source", "unknown")
+        chunk_index = item["metadata"].get("chunk_index", 0)
+        sections.append(
+            f"--- SOURCE_{index} | {source} | passage {chunk_index} ---\n"
+            f"{item['document']}\n"
+            f"--- END SOURCE_{index} ---"
+        )
+    return "\n\n".join(sections)
+
+
+def validate_citations(answer: str, retrieved: list[dict[str, Any]]) -> bool:
+    """Ensure every filename citation in an answer belongs to retrieved sources."""
+    cited_files = set(re.findall(r"\[Source:\s*([^\]]+)\]", answer))
+    valid_files = {
+        item["metadata"].get("source")
+        for item in retrieved
+        if item["metadata"].get("source")
+    }
+    return cited_files.issubset(valid_files)
+
+
+def ask_agent(query: str) -> str:
+    """Retrieve source passages and synthesize a cited answer using Gemini."""
+    retrieved = retrieve(query)
+    context = build_context(retrieved)
+
+    prompt = f"""You are a strict research assistant.
+Answer the user's question using ONLY the source passages below.
+
+Rules:
+1. Do not use outside knowledge or assumptions.
+2. If the sources do not contain enough information to answer the question, reply EXACTLY:
+The provided sources do not contain the answer to this question.
+3. Every factual claim must end with a citation in this exact format: [Source: filename.txt]
+4. Only cite filenames that appear in the provided source passages.
+5. Do not invent source names, facts, dates, or details.
+6. Keep the answer concise and directly answer the question.
+
+SOURCE PASSAGES:
 {context}
 
 USER QUESTION: {query}
 """
 
-    response = client.models.generate_content(
-        model='gemini-3.5-flash',
-        contents=prompt
-    )
-    
-    print("\n[Answer]:")
-    print(response.text.strip())
-    print("-" * 60)
-    return response.text
+    client = get_gemini_client()
+    response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+    answer = (response.text or "").strip()
+
+    if not answer:
+        raise RuntimeError("Gemini returned an empty response.")
+
+    if not answer.startswith("The provided sources do not contain the answer") and not validate_citations(
+        answer, retrieved
+    ):
+        raise RuntimeError(
+            "Gemini returned a citation that was not present in the retrieved sources."
+        )
+
+    return answer
+
+
+def run_demo() -> None:
+    """Run the three challenge questions."""
+    load_documents()
+
+    questions = [
+        "What is the fundamental unit of information in a quantum computer, and what special state allows it to perform simultaneous calculations?",
+        "Which rover is currently searching for signs of ancient life on Mars, and where did it land?",
+        "When did the Apollo 11 mission land on the moon?",
+    ]
+
+    print("\n" + "=" * 70)
+    print("Research Agent (with Citations)")
+    print("=" * 70)
+
+    for question in questions:
+        print(f"\n[Question] {question}")
+        print("[Answer]")
+        print(ask_agent(question))
+        print("-" * 70)
+
 
 if __name__ == "__main__":
-    # 1. Load documents into the vector database
-    load_documents()
-    
-    print("\n" + "="*60)
-    print("Research Agent (with Citations) Initialized")
-    print("="*60)
-    
-    # 2. Run test questions
-    ask_agent("What is the fundamental unit of information in a quantum computer, and what special state allows it to perform simultaneous calculations?")
-    
-    ask_agent("Which rover is currently searching for signs of ancient life on Mars, and where did it land?")
-    
-    # This question tests if the model will hallucinate or follow rule #2
-    ask_agent("When did the Apollo 11 mission land on the moon?")
+    run_demo()
