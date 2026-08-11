@@ -1,59 +1,133 @@
 # Research Agent (with Citations)
 
-This project is a functioning AI Research Agent that takes a question, retrieves relevant context from a set of source documents, and synthesizes a precise answer. Crucially, it forces the AI to **cite its sources** and prevents hallucination by strictly stating when an answer cannot be found in the provided texts.
+A small, reproducible Retrieval-Augmented Generation (RAG) research agent built for the ROOMAN AI Challenge. It accepts a question, retrieves relevant passages from the provided source documents, and asks Gemini to synthesize an answer with source citations.
 
-Built in 24 hours for the ROOMAN AI CHALLENGE.
+The agent is intentionally simple: local ChromaDB handles semantic retrieval and Gemini handles answer synthesis. It does **not** use outside knowledge when answering from the provided sources.
 
 ## 🚀 Features
-- **Retrieval-Augmented Generation (RAG):** Uses local semantic search to find relevant information.
-- **Strict Citations:** The model is prompted to cite the exact filename for every claim.
-- **Hallucination Prevention:** The agent refuses to answer if the context is missing.
-- **100% Local Embeddings:** Uses `chromadb` with local sentence-transformers, meaning no API costs for document embedding.
-- **Gemini Powered:** Uses the fast and powerful `gemini-3.5-flash` model for synthesis.
 
-## 🛠️ Setup Instructions (Foolproof)
+- **RAG:** Semantic retrieval over the supplied `.txt` source documents.
+- **Passage-level retrieval:** Source files are split into small passages before indexing.
+- **Grounded citations:** The prompt requires every factual claim to cite a retrieved filename.
+- **Citation validation:** Generated filename citations are checked against the sources actually retrieved.
+- **Hallucination test:** An out-of-scope question demonstrates the required refusal behavior.
+- **Local embeddings:** ChromaDB uses its local default embedding function, so no separate embedding API key is required.
+- **Gemini synthesis:** Uses `gemini-3.5-flash` for the final answer.
+
+## 🧱 Architecture
+
+```text
+Question
+   │
+   ▼
+ChromaDB semantic retrieval
+   │
+   ▼
+Top relevant source passages
+   │
+   ▼
+Grounded Gemini prompt
+   │
+   ▼
+Cited answer / source-not-found refusal
+```
+
+## 🛠️ Setup
 
 ### Prerequisites
-- Python 3.9+
-- A Google Gemini API Key (Get one for free at [Google AI Studio](https://aistudio.google.com/))
+
+- Python **3.10+**
+- A Google Gemini API key
 
 ### Installation
-1. **Clone the repository** (or download the files).
-2. **Create a Virtual Environment:**
-   ```bash
-   python -m venv venv
-   # On Windows:
-   .\venv\Scripts\activate
-   # On Mac/Linux:
-   source venv/bin/activate
-   ```
-3. **Install Dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. **Configure Environment Variables:**
-   - Rename `.env.example` to `.env`
-   - Open `.env` and add your Gemini API Key:
-     ```
-     GEMINI_API_KEY=your_actual_key_here
-     ```
 
-### Running the Agent
-Run the main script to ingest the sample data and answer the predefined test questions:
+```bash
+git clone https://github.com/Adityaaun/ai-research-agent-challenge.git
+cd ai-research-agent-challenge
+
+python -m venv venv
+```
+
+Windows PowerShell:
+
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+Windows Command Prompt:
+
+```cmd
+venv\Scripts\activate
+```
+
+macOS/Linux:
+
+```bash
+source venv/bin/activate
+```
+
+Install the pinned dependencies:
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### Configure the API key
+
+Copy `.env.example` to `.env` and replace the placeholder:
+
+```text
+GEMINI_API_KEY=your_actual_key_here
+```
+
+**Never commit `.env` or a real API key.** `.env` is excluded by `.gitignore`.
+
+## ▶️ Run
+
+From the repository root:
+
 ```bash
 python src/agent.py
 ```
-The script will automatically read the `.txt` files in the `data/` folder, embed them into the local vector database, and print out the cited answers in your terminal.
 
-## 📁 Project Structure
-- `/data`: Contains the sample source documents (`.txt`).
-- `/src/agent.py`: The core agent logic (Document Loader + Vector DB + Gemini integration).
-- `requirements.txt`: Pinned dependencies for reproducibility.
-- `questions.md`: The test questions used to evaluate the agent.
-- `sample_outputs.md`: A transcript of the agent running successfully.
+The script loads the sample documents, indexes their passages, and runs the three challenge questions in `questions.md`.
 
-## ⚖️ Tradeoff Notes & Design Choices
-- **Why ChromaDB?** I chose Chroma for this 24-hour challenge because it comes with an out-of-the-box local embedding model (`all-MiniLM-L6-v2`). This makes setup foolproof for reviewers (no extra embedding API keys required) and keeps the architecture lightweight.
-- **Why Gemini 3.5 Flash?** It is incredibly fast, offers a generous free tier, and follows strict system prompts (like citation rules) very well.
-- **Limitations:** Currently, the document loader treats entire `.txt` files as single chunks. This is perfectly fine for short articles, but for large enterprise PDFs, I would implement a recursive character text splitter to maintain context without exceeding token limits. 
-- **What I'd do with more time:** Add a beautiful UI using Streamlit, implement PyMuPDF to extract text from complex PDFs, and add conversation history to the prompt so the user can ask follow-up questions.
+## 🧪 Challenge Deliverables
+
+- **Question set:** [`questions.md`](questions.md)
+- **Source documents:** [`data/`](data/)
+- **Sample cited answers:** [`sample_outputs.md`](sample_outputs.md)
+- **Core implementation:** [`src/agent.py`](src/agent.py)
+- **Environment template:** [`.env.example`](.env.example)
+
+The three included questions test:
+
+1. Relevant retrieval + citation.
+2. Retrieval across a different source + citation.
+3. A question not answered by the provided sources, where the agent must refuse rather than use outside knowledge.
+
+## 🔎 Retrieval and Tool Approach
+
+1. Every `.txt` file in `data/` is read as a source document.
+2. Each document is split into small passages while preserving paragraph boundaries.
+3. ChromaDB creates local embeddings and stores the passages with filename metadata.
+4. A user question is embedded and the most relevant passages are retrieved.
+5. The retrieved passages are inserted into a strict Gemini prompt with explicit source boundaries.
+6. Gemini must answer only from those passages and cite the source filename for factual claims.
+7. The application validates that generated filename citations belong to the retrieved sources.
+
+This is deliberately lightweight for a 24-hour challenge. It avoids adding a separate orchestration framework when a small Python pipeline is sufficient.
+
+## ⚖️ Design Tradeoffs and Limitations
+
+- **Why ChromaDB?** It provides a local vector database and local embedding path with minimal application code and no separate embedding API key.
+- **Why Gemini?** It provides the synthesis step while the retrieval context constrains the answer to the supplied sources.
+- **Why passage chunks?** The original implementation indexed one entire file as one chunk. Passage-level chunks make retrieval more precise while keeping the implementation small.
+- **Why filename citations?** They are easy for a reviewer to verify against the supplied source documents. The application also validates that cited filenames were actually retrieved.
+- **Current scope:** The loader supports `.txt` files only. PDF extraction, web search, reranking, and conversational memory are intentionally outside the challenge scope.
+- **Refusal behavior:** If the retrieved evidence is insufficient, the model is instructed to return the exact source-not-found message. Because this is LLM-based, the project keeps the retrieved context explicit and validates citations to reduce unsupported claims.
+
+## 📌 Reproducibility
+
+Dependencies are pinned in `requirements.txt`. The repository includes sample source documents, questions, expected behavior, and sample outputs so a reviewer can reproduce the demonstration quickly.
