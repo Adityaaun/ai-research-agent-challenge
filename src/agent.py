@@ -1,7 +1,7 @@
 import os
 import glob
 import chromadb
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -11,7 +11,9 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key or api_key == "your_gemini_api_key_here":
     raise ValueError("Valid GEMINI_API_KEY not found in .env file. Please add it.")
-genai.configure(api_key=api_key)
+    
+# Initialize the new Google GenAI client
+client = genai.Client(api_key=api_key)
 
 # Initialize ChromaDB (Local vector database)
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
@@ -90,9 +92,10 @@ SOURCES:
 USER QUESTION: {query}
 """
 
-    # 4. Generate the response using Gemini
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model='gemini-1.5-flash',
+        contents=prompt
+    )
     
     print("\n[Answer]:")
     print(response.text.strip())
@@ -104,7 +107,7 @@ if __name__ == "__main__":
     load_documents()
     
     print("\n" + "="*60)
-    print("🤖 Research Agent (with Citations) Initialized")
+    print("Research Agent (with Citations) Initialized")
     print("="*60)
     
     # 2. Run test questions
