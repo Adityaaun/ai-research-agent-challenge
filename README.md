@@ -6,8 +6,9 @@ The agent is intentionally simple: local ChromaDB handles semantic retrieval and
 
 ## 🚀 Features
 
-- **RAG:** Semantic retrieval over the supplied `.txt` source documents.
+- **RAG:** Semantic retrieval over supplied `.txt` source documents.
 - **Passage-level retrieval:** Source files are split into small passages before indexing.
+- **Custom source directory:** Reviewers can point the agent at another directory of `.txt` sources.
 - **Grounded citations:** The prompt requires every factual claim to cite a retrieved filename.
 - **Citation validation:** Generated filename citations are checked against the sources actually retrieved, and uncited answerable responses are rejected.
 - **Custom questions:** Reviewers can pass any question through the CLI.
@@ -18,22 +19,25 @@ The agent is intentionally simple: local ChromaDB handles semantic retrieval and
 ## 🧱 Architecture
 
 ```text
-Question
-   │
-   ▼
-ChromaDB semantic retrieval
-   │
-   ▼
-Top relevant source passages
-   │
-   ▼
-Grounded Gemini prompt
-   │
-   ▼
-Cited answer / source-not-found refusal
-   │
-   ▼
-Citation validation
+Question + source directory
+          │
+          ▼
+   Document loading/chunking
+          │
+          ▼
+ ChromaDB semantic retrieval
+          │
+          ▼
+ Top relevant source passages
+          │
+          ▼
+  Grounded Gemini prompt
+          │
+          ▼
+ Cited answer / refusal
+          │
+          ▼
+  Citation validation
 ```
 
 ## 🛠️ Setup
@@ -95,10 +99,16 @@ From the repository root, run the complete three-question demonstration:
 python src/agent.py
 ```
 
-To ask a custom question using only the supplied source documents:
+To ask a custom question using the supplied sources:
 
 ```bash
 python src/agent.py --question "What is a qubit?"
+```
+
+To use a different directory containing `.txt` source documents:
+
+```bash
+python src/agent.py --question "What does this source say about X?" --data-dir ./my_sources
 ```
 
 ## 🧪 Tests
@@ -129,7 +139,7 @@ The three included questions test:
 
 ## 🔎 Retrieval and Tool Approach
 
-1. Every `.txt` file in `data/` is read as a source document.
+1. Every `.txt` file in the selected source directory is read as a source document.
 2. Each document is split into small passages while preserving paragraph boundaries.
 3. ChromaDB creates local embeddings and stores the passages with filename metadata.
 4. A user question is embedded and the most relevant passages are retrieved.
