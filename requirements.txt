@@ -1,3 +1,4 @@
 google-genai==1.75.0
 chromadb==1.5.9
 python-dotenv==1.2.2
+pytest==9.1.1
