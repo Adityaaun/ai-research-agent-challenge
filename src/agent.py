@@ -166,19 +166,14 @@ SOURCE PASSAGES:
 USER QUESTION: {query}
 """
 
-    response = get_gemini_client().models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-    )
+    response = get_gemini_client().models.generate_content(model=MODEL_NAME, contents=prompt)
     answer = (response.text or "").strip()
     if not answer:
         raise RuntimeError("Gemini returned an empty response.")
     if answer == REFUSAL:
         return answer
     if not validate_citations(answer, retrieved):
-        raise RuntimeError(
-            "Gemini returned an answer without valid citations from the retrieved sources."
-        )
+        raise RuntimeError("Gemini returned an answer without valid citations from the retrieved sources.")
     return answer
 
 
