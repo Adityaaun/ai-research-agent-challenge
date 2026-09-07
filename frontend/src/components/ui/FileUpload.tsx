@@ -145,7 +145,6 @@ export function FileUpload({ onUploadSuccess }: FileUploadProps) {
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
               onChange={onChange}
               accept=".txt,.pdf,.md,.csv"
-              disabled={uploadState === 'uploading'}
             />
             <UploadCloud className="w-10 h-10 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground">Drag & drop your documents</h3>
