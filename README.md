@@ -1,12 +1,12 @@
-# Veritas RAG — Evidence-First AI Research Agent
+# Veritas RAG — Evidence-Grounded AI Research Agent
 
-Veritas RAG is a full-stack AI research agent that performs deep, grounded research over custom knowledge bases. It enforces an "evidence-first" pipeline: retrieving, verifying, and citing sources before generating any final report.
+Veritas RAG is a full-stack AI research agent that performs deep, evidence-grounded research over custom knowledge bases. It enforces an "evidence-first" pipeline: retrieving, verifying, and citing sources before generating any final report, which provides traceable evidence and reduces unsupported generation.
 
 ## Architecture
 
 ```
-Upload PDF/TXT → Parse & Chunk → Store Metadata (SQLite) → Embed & Index (ChromaDB)
-                                                                    ↓
+Upload PDF/TXT or Ingest Web URL → Parse & Chunk → Store Metadata (SQLite) → Embed & Index (ChromaDB)
+                                                                            ↓
 User Question → Decompose → Vector Search ──┐
                             BM25 Search ────┤→ RRF Fusion → CrossEncoder Rerank
                                             ↓
@@ -88,6 +88,7 @@ Evaluates four retrieval configurations: Vector-only, BM25-only, Hybrid RRF, and
 ## Limitations
 
 - **No hallucination guarantee**: The system reduces but cannot fully eliminate LLM hallucination. Claims are verified against retrieved evidence, but verification itself uses an LLM.
+- **Web Ingestion Scope**: The URL parser uses BeautifulSoup for static HTML. It does not execute JavaScript or support dynamic SPAs. Private network isolation prevents SSRF, but scraping is limited to text-heavy public sites.
 - **Evaluation scale**: The curated eval dataset is small. Production systems require larger, domain-specific benchmarks.
 - **Single-model dependency**: All LLM calls go to Gemini. API failures will cascade.
 - **No authentication**: This is a portfolio project, not a multi-tenant production service.

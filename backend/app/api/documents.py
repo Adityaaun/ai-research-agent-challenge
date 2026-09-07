@@ -2,12 +2,24 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List
 import hashlib
+from datetime import datetime, timezone
+from urllib.parse import urlparse, urlunparse
 from backend.app.database import session, models
 from backend.app.schemas import schemas
 from backend.app.ingestion import parser
 from backend.app.retrieval import chroma
 
 router = APIRouter()
+
+def normalize_url(url_str: str) -> str:
+    parsed = urlparse(url_str)
+    scheme = parsed.scheme.lower()
+    netloc = parsed.netloc.lower()
+    path = parsed.path
+    if path.endswith('/') and len(path) > 1:
+        path = path[:-1]
+    query = parsed.query
+    return urlunparse((scheme, netloc, path, '', query, ''))
 
 def _stable_id(filename: str, chunk_index: int) -> str:
     digest = hashlib.sha1(f"{filename}:{chunk_index}".encode()).hexdigest()[:16]
@@ -113,18 +125,30 @@ async def ingest_url(
         db.commit()
         db.refresh(workspace)
         
+    normalized = normalize_url(req.url)
+    
+    # Check duplicate
+    existing = db.query(models.Document).filter(
+        models.Document.workspace_id == workspace.id,
+        models.Document.filename == normalized
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=409, detail="URL already ingested in this workspace.")
+        
     try:
-        chunks = await parser.parse_url(req.url)
+        parsed_data = await parser.parse_url(normalized)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {str(e)}")
         
-    filename = req.url.split("://")[-1].split("/")[0] # domain name as filename
-    if len(filename) > 50:
-        filename = filename[:50]
+    chunks = parsed_data["chunks"]
+    title = parsed_data["title"]
+    domain = parsed_data["domain"]
+    final_url = parsed_data["url"]
         
     db_doc = models.Document(
         workspace_id=workspace.id,
-        filename=req.url,
+        filename=normalized,
         file_type="url",
         status="indexing"
     )
@@ -135,6 +159,8 @@ async def ingest_url(
     documents_to_index = []
     metadatas_to_index = []
     ids_to_index = []
+    
+    retrieved_at = datetime.now(timezone.utc).isoformat()
     
     for i, chunk in enumerate(chunks):
         db_chunk = models.DocumentChunk(
@@ -147,13 +173,18 @@ async def ingest_url(
         
         documents_to_index.append(chunk.get("text"))
         metadatas_to_index.append({
-            "source": req.url, 
+            "source_type": "web",
+            "source": normalized, 
+            "url": final_url,
+            "title": title,
+            "domain": domain,
+            "retrieved_at": retrieved_at,
             "chunk_index": i,
             "page_number": chunk.get("page", 1),
             "document_id": db_doc.id,
             "workspace_id": workspace.id
         })
-        ids_to_index.append(_stable_id(req.url, i))
+        ids_to_index.append(_stable_id(normalized, i))
         
     db.commit()
     

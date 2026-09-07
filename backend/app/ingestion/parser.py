@@ -62,17 +62,80 @@ def parse_document(filename: str, content: bytes) -> List[Dict[str, Any]]:
     else:
         raise ValueError(f"Unsupported file format: {filename}")
 
-async def parse_url(url: str) -> List[Dict[str, Any]]:
+import socket
+import ipaddress
+from urllib.parse import urlparse
+
+def is_safe_url(url_str: str) -> bool:
+    try:
+        parsed = urlparse(str(url_str))
+        if parsed.scheme not in ("http", "https"):
+            return False
+            
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+            
+        if hostname.lower() in ("localhost", "127.0.0.1", "0.0.0.0"):
+            return False
+            
+        ip_addr = socket.gethostbyname(hostname)
+        ip = ipaddress.ip_address(ip_addr)
+        
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+            return False
+            
+        return True
+    except Exception:
+        return False
+
+async def verify_request(request: httpx.Request):
+    if not is_safe_url(str(request.url)):
+        raise ValueError("URL points to a private or internal network address.")
+
+async def parse_url(url: str) -> Dict[str, Any]:
     """Parse text from a web URL asynchronously."""
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+    if not is_safe_url(url):
+        raise ValueError("URL points to a private or internal network address.")
+        
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, event_hooks={'request': [verify_request]}) as client:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         response = await client.get(url, headers=headers)
         response.raise_for_status()
     
     soup = BeautifulSoup(response.text, "html.parser")
-    # Remove scripts, styles, navs etc.
-    for element in soup(["script", "style", "nav", "footer", "header"]):
+    
+    # Extract title
+    title = ""
+    if soup.title and soup.title.string:
+        title = soup.title.string.strip()
+        
+    # Remove unwanted tags
+    for element in soup(["script", "style", "noscript", "nav", "footer", "header", "aside", "form", "iframe"]):
         element.decompose()
         
-    text = soup.get_text(separator="\n", strip=True)
-    return chunk_text_with_metadata(text, page_num=1)
+    # Get main content
+    text_content = []
+    main_containers = soup.find_all(["article", "main", "section"])
+    if main_containers:
+        for container in main_containers:
+            text_content.append(container.get_text(separator="\n", strip=True))
+    else:
+        # Fallback
+        text_content.append(soup.get_text(separator="\n", strip=True))
+        
+    final_text = "\n".join(text_content).strip()
+    if not final_text:
+        raise ValueError("No meaningful text could be extracted from the URL.")
+        
+    chunks = chunk_text_with_metadata(final_text, page_num=1)
+    
+    parsed = urlparse(str(response.url))
+    domain = parsed.hostname if parsed.hostname else url
+    
+    return {
+        "chunks": chunks,
+        "title": title if title else domain,
+        "domain": domain,
+        "url": str(response.url)
+    }
