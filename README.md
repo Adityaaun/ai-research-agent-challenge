@@ -1,6 +1,6 @@
-# RESEARCHOS — Evidence-First AI Research Agent
+# Veritas RAG — Evidence-First AI Research Agent
 
-RESEARCHOS is a full-stack AI research agent that performs deep, grounded research over custom knowledge bases. It enforces an "evidence-first" pipeline: retrieving, verifying, and citing sources before generating any final report.
+Veritas RAG is a full-stack AI research agent that performs deep, grounded research over custom knowledge bases. It enforces an "evidence-first" pipeline: retrieving, verifying, and citing sources before generating any final report.
 
 ## Architecture
 

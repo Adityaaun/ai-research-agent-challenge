@@ -108,8 +108,8 @@ async def run_deep_research(question: str, workspace_id: str, db: Session) -> As
         
         context = "\n\n".join([f"--- SOURCE ID: {item['id']} | {item['metadata']['source']} ---\n{item['document']}" for item in evidence_list])
         
-        prompt = f"""You are an Evidence-First Research Assistant for RESEARCHOS.
-Answer the user's question using ONLY the provided evidence.
+        prompt = f"""You are an Evidence-First Research Assistant for Veritas RAG.
+Your task is to write a comprehensive, factual response to the user's question based ONLY on the verified claims.
 
 Question: {question}
 

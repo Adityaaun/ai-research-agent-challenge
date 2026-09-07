@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
-    title="RESEARCHOS API",
+    title="Veritas RAG API",
     description="Evidence-First AI Research Intelligence Platform",
     version="1.0.0",
 )
@@ -18,7 +18,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to RESEARCHOS API"}
+    return {"message": "Welcome to Veritas RAG API"}
 
 from backend.app.api import endpoints
 from backend.app.database.session import engine

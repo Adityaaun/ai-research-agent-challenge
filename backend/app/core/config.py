@@ -3,14 +3,14 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "RESEARCHOS"
+    PROJECT_NAME: str = "Veritas RAG"
     API_V1_STR: str = "/api/v1"
     
     # Base directory
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     
     # DB
-    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/researchos.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/veritas.db")
     
     # Vector DB
     CHROMA_DIR: Path = BASE_DIR / "chroma_db"
