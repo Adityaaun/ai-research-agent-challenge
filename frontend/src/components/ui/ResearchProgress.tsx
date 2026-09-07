@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
+import { API_BASE } from "../../config"
 
 interface ResearchProgressProps {
   question: string
@@ -25,7 +26,7 @@ export function ResearchProgress({ question, workspaceId, onComplete }: Research
     if (!question) return
     
     // Connect to SSE endpoint
-    const url = new URL('http://localhost:8000/api/v1/research/start')
+    const url = new URL(`${API_BASE}/api/v1/research/start`)
     url.searchParams.append('question', question)
     if (workspaceId) {
       url.searchParams.append('workspace_id', workspaceId)

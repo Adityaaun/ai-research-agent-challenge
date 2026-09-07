@@ -4,6 +4,8 @@ import { ResearchProgress } from './components/ui/ResearchProgress'
 import { EvidenceGraph } from './components/ui/EvidenceGraph'
 import { motion, AnimatePresence } from 'framer-motion'
 
+import { API_BASE } from './config'
+
 function App() {
   const [workspaces, setWorkspaces] = useState<any[]>([])
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
@@ -19,7 +21,7 @@ function App() {
 
   const fetchWorkspaces = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/workspaces/')
+      const res = await fetch(`${API_BASE}/api/v1/workspaces/`)
       if (res.ok) {
         const data = await res.json()
         setWorkspaces(data)
@@ -44,12 +46,12 @@ function App() {
     if (!activeWorkspaceId) return
     
     // Fetch documents for workspace
-    fetch(`http://localhost:8000/api/v1/documents/?workspace_id=${activeWorkspaceId}`)
+    fetch(`${API_BASE}/api/v1/documents/?workspace_id=${activeWorkspaceId}`)
       .then(res => res.json())
       .then(data => setDocuments(data))
       
     // Fetch sessions for workspace
-    fetch(`http://localhost:8000/api/v1/research/sessions?workspace_id=${activeWorkspaceId}`)
+    fetch(`${API_BASE}/api/v1/research/sessions?workspace_id=${activeWorkspaceId}`)
       .then(res => res.json())
       .then(data => {
         if (data.length > 0) {
@@ -74,7 +76,7 @@ function App() {
 
   const handleNewChat = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/workspaces/', {
+      const res = await fetch(`${API_BASE}/api/v1/workspaces/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: "New Research Chat" })
@@ -90,7 +92,7 @@ function App() {
 
   const handleDeleteWorkspace = async (id: string) => {
     try {
-      await fetch(`http://localhost:8000/api/v1/workspaces/${id}`, { method: 'DELETE' })
+      await fetch(`${API_BASE}/api/v1/workspaces/${id}`, { method: 'DELETE' })
       setWorkspaces(prev => prev.filter(w => w.id !== id))
       if (activeWorkspaceId === id) {
         const remaining = workspaces.filter(w => w.id !== id)
@@ -111,7 +113,7 @@ function App() {
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/documents/${id}`, {
+      const response = await fetch(`${API_BASE}/api/v1/documents/${id}`, {
         method: 'DELETE',
       })
       if (response.ok) {

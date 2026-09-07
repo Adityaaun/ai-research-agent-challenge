@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Link as LinkIcon, FileText } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { API_BASE } from '../../config'
 
 interface FileUploadProps {
   onUploadSuccess: (doc: any) => void
@@ -34,7 +35,7 @@ export function FileUpload({ onUploadSuccess, workspaceId }: FileUploadProps) {
     const formData = new FormData()
     formData.append('file', file)
 
-    let reqUrl = 'http://localhost:8000/api/v1/documents/upload'
+    let reqUrl = `${API_BASE}/api/v1/documents/upload`
     if (workspaceId) {
        reqUrl += `?workspace_id=${workspaceId}`
     }
@@ -46,7 +47,8 @@ export function FileUpload({ onUploadSuccess, workspaceId }: FileUploadProps) {
       })
 
       if (!response.ok) {
-        throw new Error('Upload failed')
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Upload failed')
       }
 
       const data = await response.json()
@@ -69,7 +71,7 @@ export function FileUpload({ onUploadSuccess, workspaceId }: FileUploadProps) {
     setUploadState('uploading')
     
     try {
-      const response = await fetch('http://localhost:8000/api/v1/documents/ingest-url', {
+      const response = await fetch(`${API_BASE}/api/v1/documents/ingest-url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -78,7 +80,8 @@ export function FileUpload({ onUploadSuccess, workspaceId }: FileUploadProps) {
       })
 
       if (!response.ok) {
-        throw new Error('URL ingestion failed')
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.detail || 'URL ingestion failed')
       }
 
       const data = await response.json()

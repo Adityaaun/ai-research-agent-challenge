@@ -66,6 +66,37 @@ npm install
 npm run dev
 ```
 
+## Deployment
+
+### Backend
+The backend requires Python 3.10+ and persistent storage for SQLite (`veritas.db`) and ChromaDB (`chroma_db/`).
+If deploying to a containerized environment (e.g., Render, Railway, AWS ECS), ensure you mount a persistent volume, otherwise indexed documents will be lost on restart.
+
+Required environment variables (`backend/.env`):
+```env
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-3.6-flash
+DATABASE_URL=sqlite:///./veritas.db
+CHROMA_DIR=./chroma_db
+FRONTEND_URL=https://your-deployed-frontend.vercel.app
+```
+Start the application:
+```bash
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Frontend
+The frontend requires Node.js 18+ and can be deployed to static hosting (e.g., Vercel, Netlify).
+
+Required environment variable (`frontend/.env`):
+```env
+VITE_API_URL=https://your-deployed-backend.onrender.com
+```
+Build the production bundle:
+```bash
+npm run build
+```
+
 ## Testing
 
 ```bash

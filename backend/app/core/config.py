@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
+    # CORS
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
     model_config = SettingsConfigDict(env_file=str(BASE_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
