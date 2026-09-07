@@ -30,5 +30,7 @@ def list_sessions(workspace_id: str = None, db: Session = Depends(session.get_db
     return [{
         "id": s.id,
         "question": s.question,
+        "report": s.report,
+        "claims_data": s.claims_data,
         "created_at": s.created_at
     } for s in sessions]

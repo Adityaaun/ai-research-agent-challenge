@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from typing import AsyncGenerator
 from sqlalchemy.orm import Session
@@ -24,7 +25,11 @@ Question: {question}
             return [question]
         return sub_questions
     except Exception as e:
-        logger.warning(f"Decomposition failed, using original question. Error: {e}")
+        logger.warning(f"Decomposition failed, using fallback split. Error: {e}")
+        # Naive split for multi-part questions if API is down
+        parts = [p.strip() for p in re.split(r'\band\b', question, flags=re.IGNORECASE) if p.strip()]
+        if len(parts) > 1:
+            return parts
         return [question]
 
 async def run_deep_research(question: str, workspace_id: str, db: Session) -> AsyncGenerator[str, None]:
@@ -33,6 +38,15 @@ async def run_deep_research(question: str, workspace_id: str, db: Session) -> As
     
     try:
         logger.info(f"Starting research session for workspace: {workspace_id}")
+        
+        # Dynamically rename workspace if it's the first question
+        if workspace_id:
+            workspace = db.query(models.Workspace).filter(models.Workspace.id == workspace_id).first()
+            if workspace and workspace.name == "New Research Chat":
+                # Create a concise title from the question
+                title = question[:35] + ("..." if len(question) > 35 else "")
+                workspace.name = title
+                db.commit()
         
         # Step 1: Planning
         yield json.dumps({"status": "progress", "step": "Planning", "message": "Decomposing research question..."})
@@ -50,7 +64,7 @@ async def run_deep_research(question: str, workspace_id: str, db: Session) -> As
         
         all_evidence = []
         for sq in sub_questions:
-            results = hybrid.hybrid_search(sq, db, workspace_id, top_k=5)
+            results = hybrid.hybrid_search(sq, db, workspace_id, top_k=20)
             all_evidence.extend(results)
             
         if not all_evidence:

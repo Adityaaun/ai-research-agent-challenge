@@ -3,6 +3,7 @@ import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
 
 interface ResearchProgressProps {
   question: string
+  workspaceId?: string
   onComplete: (data: any) => void
 }
 
@@ -16,7 +17,7 @@ const STEPS = [
   "Writing report"
 ]
 
-export function ResearchProgress({ question, onComplete }: ResearchProgressProps) {
+export function ResearchProgress({ question, workspaceId, onComplete }: ResearchProgressProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [messages, setMessages] = useState<string[]>([])
   
@@ -26,6 +27,9 @@ export function ResearchProgress({ question, onComplete }: ResearchProgressProps
     // Connect to SSE endpoint
     const url = new URL('http://localhost:8000/api/v1/research/start')
     url.searchParams.append('question', question)
+    if (workspaceId) {
+      url.searchParams.append('workspace_id', workspaceId)
+    }
     
     const eventSource = new EventSource(url.toString())
     
@@ -54,7 +58,7 @@ export function ResearchProgress({ question, onComplete }: ResearchProgressProps
     return () => {
       eventSource.close()
     }
-  }, [question, onComplete])
+  }, [question, workspaceId, onComplete])
 
   return (
     <div className="bg-card border rounded-xl p-6 shadow-sm space-y-6">

@@ -212,3 +212,31 @@ def list_documents(workspace_id: str = None, db: Session = Depends(session.get_d
     if workspace_id:
         query = query.filter(models.Document.workspace_id == workspace_id)
     return query.all()
+
+@router.delete("/{document_id}")
+def delete_document(document_id: str, db: Session = Depends(session.get_db)):
+    """Delete a document and its chunks from DB and Chroma."""
+    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    workspace_id = doc.workspace_id
+    
+    # Delete from ChromaDB
+    try:
+        chroma.collection.delete(where={"document_id": document_id})
+    except Exception as e:
+        print(f"Error deleting from Chroma: {e}")
+        
+    # Delete chunks from relational DB
+    db.query(models.DocumentChunk).filter(models.DocumentChunk.document_id == document_id).delete()
+    
+    # Delete document from relational DB
+    db.delete(doc)
+    db.commit()
+    
+    # Invalidate BM25 cache
+    from backend.app.retrieval.hybrid import invalidate_bm25_cache
+    invalidate_bm25_cache(workspace_id)
+    
+    return {"message": "Document deleted successfully"}

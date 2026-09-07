@@ -4,9 +4,10 @@ import { cn } from '../../lib/utils'
 
 interface FileUploadProps {
   onUploadSuccess: (doc: any) => void
+  workspaceId?: string
 }
 
-export function FileUpload({ onUploadSuccess }: FileUploadProps) {
+export function FileUpload({ onUploadSuccess, workspaceId }: FileUploadProps) {
   const [mode, setMode] = useState<'file' | 'url'>('file')
   const [url, setUrl] = useState('')
   const [isDragging, setIsDragging] = useState(false)
@@ -33,8 +34,13 @@ export function FileUpload({ onUploadSuccess }: FileUploadProps) {
     const formData = new FormData()
     formData.append('file', file)
 
+    let reqUrl = 'http://localhost:8000/api/v1/documents/upload'
+    if (workspaceId) {
+       reqUrl += `?workspace_id=${workspaceId}`
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/api/v1/documents/upload', {
+      const response = await fetch(reqUrl, {
         method: 'POST',
         body: formData,
       })
@@ -68,7 +74,7 @@ export function FileUpload({ onUploadSuccess }: FileUploadProps) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), workspace_id: workspaceId }),
       })
 
       if (!response.ok) {

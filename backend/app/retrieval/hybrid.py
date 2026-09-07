@@ -151,10 +151,10 @@ def hybrid_search(query: str, db: Session, workspace_id: str = None, top_k: int 
     """Perform hybrid search (Vector + BM25 + Rank Fusion + Reranking)."""
     # 1. Vector Search with native filtering
     where_clause = {"workspace_id": workspace_id} if workspace_id else None
-    vector_results = chroma.retrieve(query, n_results=15, where=where_clause)
+    vector_results = chroma.retrieve(query, n_results=100, where=where_clause)
         
     # 2. BM25 Search
-    bm25_results = get_bm25_results(query, db, workspace_id, top_k=15)
+    bm25_results = get_bm25_results(query, db, workspace_id, top_k=100)
     
     # 3. Rank Fusion
     fused_results = reciprocal_rank_fusion(vector_results, bm25_results)

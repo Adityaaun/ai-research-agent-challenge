@@ -28,6 +28,7 @@ from backend.app.database import models
 models.Base.metadata.create_all(bind=engine)
 
 app.include_router(endpoints.router, prefix="/api/v1")
-from backend.app.api import documents, research
+from backend.app.api import documents, research, workspaces
 app.include_router(documents.router, prefix="/api/v1/documents", tags=["documents"])
 app.include_router(research.router, prefix="/api/v1/research", tags=["research"])
+app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
