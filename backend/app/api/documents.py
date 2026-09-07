@@ -97,6 +97,84 @@ async def upload_document(
         
     return db_doc
 
+@router.post("/ingest-url", response_model=schemas.Document)
+async def ingest_url(
+    req: schemas.URLIngestRequest,
+    db: Session = Depends(session.get_db)
+):
+    """Fetch, parse, chunk, and index a web URL."""
+    workspace = None
+    if req.workspace_id:
+        workspace = db.query(models.Workspace).filter(models.Workspace.id == req.workspace_id).first()
+    
+    if not workspace:
+        workspace = models.Workspace(name="Default Workspace")
+        db.add(workspace)
+        db.commit()
+        db.refresh(workspace)
+        
+    try:
+        chunks = await parser.parse_url(req.url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {str(e)}")
+        
+    filename = req.url.split("://")[-1].split("/")[0] # domain name as filename
+    if len(filename) > 50:
+        filename = filename[:50]
+        
+    db_doc = models.Document(
+        workspace_id=workspace.id,
+        filename=req.url,
+        file_type="url",
+        status="indexing"
+    )
+    db.add(db_doc)
+    db.commit()
+    db.refresh(db_doc)
+    
+    documents_to_index = []
+    metadatas_to_index = []
+    ids_to_index = []
+    
+    for i, chunk in enumerate(chunks):
+        db_chunk = models.DocumentChunk(
+            document_id=db_doc.id,
+            chunk_index=i,
+            page_number=chunk.get("page"),
+            text_content=chunk.get("text")
+        )
+        db.add(db_chunk)
+        
+        documents_to_index.append(chunk.get("text"))
+        metadatas_to_index.append({
+            "source": req.url, 
+            "chunk_index": i,
+            "page_number": chunk.get("page", 1),
+            "document_id": db_doc.id,
+            "workspace_id": workspace.id
+        })
+        ids_to_index.append(_stable_id(req.url, i))
+        
+    db.commit()
+    
+    try:
+        chroma.collection.add(
+            documents=documents_to_index,
+            metadatas=metadatas_to_index,
+            ids=ids_to_index
+        )
+        db_doc.status = "indexed"
+        db.commit()
+        
+        from backend.app.retrieval.hybrid import invalidate_bm25_cache
+        invalidate_bm25_cache(workspace.id)
+    except Exception as e:
+        db_doc.status = "error"
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to index vectors: {e}")
+        
+    return db_doc
+
 @router.get("/", response_model=List[schemas.Document])
 def list_documents(workspace_id: str = None, db: Session = Depends(session.get_db)):
     query = db.query(models.Document)

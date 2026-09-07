@@ -32,6 +32,10 @@ class AskRequest(BaseModel):
     question: str
     workspace_id: Optional[str] = None
 
+class URLIngestRequest(BaseModel):
+    url: str
+    workspace_id: Optional[str] = None
+
 class AskResponse(BaseModel):
     answer: str
     sources: List[dict]

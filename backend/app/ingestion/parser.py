@@ -2,6 +2,8 @@ import re
 from typing import List, Dict, Any
 from pypdf import PdfReader
 from io import BytesIO
+import httpx
+from bs4 import BeautifulSoup
 
 MAX_CHUNK_WORDS = 220
 
@@ -59,3 +61,18 @@ def parse_document(filename: str, content: bytes) -> List[Dict[str, Any]]:
         return parse_txt(content)
     else:
         raise ValueError(f"Unsupported file format: {filename}")
+
+async def parse_url(url: str) -> List[Dict[str, Any]]:
+    """Parse text from a web URL asynchronously."""
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+    
+    soup = BeautifulSoup(response.text, "html.parser")
+    # Remove scripts, styles, navs etc.
+    for element in soup(["script", "style", "nav", "footer", "header"]):
+        element.decompose()
+        
+    text = soup.get_text(separator="\n", strip=True)
+    return chunk_text_with_metadata(text, page_num=1)
