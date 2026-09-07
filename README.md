@@ -25,10 +25,13 @@ User Question → Decompose → Vector Search ──┐
 2. **Verification Agent**: Cross-references each claim against all passages, labeling as `SUPPORT`, `CONTRADICT`, or `NEUTRAL`.
 3. **Confidence Scoring**: Heuristic algorithm based on support count, reranker relevance scores, and contradiction penalties.
 
-### Frontend
-- Real-time SSE progress streaming.
-- Interactive React Flow evidence graph.
-- Confidence badges and scoring reasons per claim.
+## Features
+- **ChatGPT-Style Workspaces**: Seamlessly switch between different research chats. Each workspace acts as an isolated knowledge base.
+- **Dynamic Chat Naming**: Chats automatically rename themselves based on the first question asked using an intelligent fallback splitting strategy.
+- **Isolated Document Contexts**: Documents uploaded to Chat A do not pollute the retrieval context of Chat B.
+- **Collapsible Sidebar UI**: Sleek, responsive React sidebar that toggles off-screen to maximize reading space for complex research reports.
+- **Deep Web Ingestion**: Securely scrape public URLs (with SSRF protection against internal/private IPs) to expand your knowledge base on the fly.
+- **Evidence Graph visualization**: A node-based interactive graph (via React Flow) linking generated claims directly to their source text chunks.
 
 ## Tech Stack
 - **Backend**: Python, FastAPI, SQLAlchemy, SQLite, ChromaDB, Sentence-Transformers, Google Gemini API
