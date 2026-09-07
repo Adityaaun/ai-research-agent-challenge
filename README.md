@@ -1,172 +1,57 @@
-# Research Agent (with Citations)
+# RESEARCHOS: Evidence-First AI Research Intelligence Platform
 
-A small, reproducible Retrieval-Augmented Generation (RAG) research agent built for the ROOMAN AI Challenge. It accepts a question, retrieves relevant passages from the provided source documents, and asks Gemini to synthesize an answer with source citations.
+RESEARCHOS is a premium, portfolio-level RAG (Retrieval-Augmented Generation) application designed to prevent LLM hallucinations by prioritizing evidence, citations, and algorithmic confidence scoring. 
 
-The agent is intentionally simple: local ChromaDB handles semantic retrieval and Gemini handles answer synthesis. It does **not** use outside knowledge when answering from the provided sources.
+Unlike generic ChatGPT clones, RESEARCHOS forces the AI (Gemini) to cite its sources down to the exact chunk and page number, dynamically extracting and cross-referencing factual claims against a hybrid knowledge base.
 
 ## 🚀 Features
 
-- **RAG:** Semantic retrieval over supplied `.txt` source documents.
-- **Passage-level retrieval:** Source files are split into small passages before indexing.
-- **Custom source directory:** Reviewers can point the agent at another directory of `.txt` sources.
-- **Grounded citations:** The prompt requires every factual claim to cite a retrieved filename.
-- **Citation validation:** Generated filename citations are checked against the sources actually retrieved, and uncited answerable responses are rejected.
-- **Custom questions:** Reviewers can pass any question through the CLI.
-- **Hallucination test:** An out-of-scope question demonstrates the required refusal behavior.
-- **Local embeddings:** ChromaDB uses its local default embedding function, so no separate embedding API key is required.
-- **Gemini synthesis:** Uses the configurable `GEMINI_MODEL` setting, defaulting to `gemini-3.6-flash`.
+*   **Drag-and-Drop Ingestion:** Effortlessly upload `.pdf` and `.txt` files via a sleek, dark-mode React frontend.
+*   **Hybrid Retrieval Engine:** Combines semantic Vector Search (ChromaDB) with lexical keyword matching (BM25) using Reciprocal Rank Fusion (RRF) for unparalleled accuracy.
+*   **Deep Research Orchestration:** Complex user queries are dynamically decomposed into sub-questions. Progress is streamed in real-time to the UI via Server-Sent Events (SSE).
+*   **Algorithmic Claim Engine:** Rather than blindly summarizing, the agent extracts discrete, structured factual claims, algorithmically scoring their confidence based on source density and direct contradictions.
+*   **Interactive Evidence Graph:** Powered by React Flow, a stunning nodal graph visually connects your original question to the generated claims and draws Support/Contradict edges directly to the raw source documents.
+*   **Persistent Research Memory:** Powered by PostgreSQL and SQLAlchemy, every deep dive, extracted claim, and piece of evidence is permanently saved for later review.
+*   **Exportable Briefs:** One-click Markdown export of structured, authoritative research reports (Executive Summary, Findings, Limitations).
 
-## 🧱 Architecture
+## 🛠️ Architecture
 
-```text
-Question + source directory
-          │
-          ▼
-   Document loading/chunking
-          │
-          ▼
- ChromaDB semantic retrieval
-          │
-          ▼
- Top relevant source passages
-          │
-          ▼
-  Grounded Gemini prompt
-          │
-          ▼
- Cited answer / refusal
-          │
-          ▼
-  Citation validation
-```
+*   **Frontend:** React, Vite, TypeScript, Tailwind CSS, shadcn/ui, React Flow, lucide-react.
+*   **Backend:** Python 3, FastAPI, SQLAlchemy, PostgreSQL.
+*   **AI/ML:** Google Gemini API, ChromaDB (Persistent Vector Store), rank-bm25, sentence-transformers.
 
-## 🛠️ Setup
+## ⚙️ How to Run Locally
 
-### Prerequisites
+### 1. Database Setup
+Ensure you have PostgreSQL running. The backend defaults to using a local sqlite database if PostgreSQL is not configured, but for production, set up the `DATABASE_URL` appropriately.
 
-- Python **3.10+**
-- A Google Gemini API key
-
-### Installation
-
+### 2. Backend Setup
 ```bash
-git clone https://github.com/Adityaaun/ai-research-agent-challenge.git
-cd ai-research-agent-challenge
-
+cd backend
 python -m venv venv
-```
-
-Windows PowerShell:
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-Windows Command Prompt:
-
-```cmd
-venv\Scripts\activate
-```
-
-macOS/Linux:
-
-```bash
-source venv/bin/activate
-```
-
-Install the pinned dependencies:
-
-```bash
-python -m pip install --upgrade pip
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
 pip install -r requirements.txt
+
+# Export your Gemini API key
+export GEMINI_API_KEY="your-api-key-here"
+
+# Run the FastAPI server
+uvicorn app.main:app --reload --port 8000
 ```
 
-### Configure the API key
-
-Copy `.env.example` to `.env` and replace the placeholder:
-
-```text
-GEMINI_API_KEY=your_actual_key_here
-```
-
-The agent defaults to `gemini-3.6-flash`. You can override the model with:
-
-```text
-GEMINI_MODEL=gemini-3.6-flash
-```
-
-**Never commit `.env` or a real API key.** `.env` is excluded by `.gitignore`.
-
-## ▶️ Run
-
-From the repository root, run the complete three-question demonstration:
-
+### 3. Frontend Setup
 ```bash
-python -u src/agent.py
+cd frontend
+npm install
+npm run dev
 ```
 
-The `-u` flag keeps terminal output unbuffered so the complete demonstration is displayed immediately.
+Navigate to `http://localhost:5173` to experience RESEARCHOS.
 
-To ask a custom question using the supplied sources:
+## 🗺️ Roadmap
+- [ ] Add Multi-Agent debate for contradictory evidence.
+- [ ] Add Web-scraping capabilities to ingest URLs alongside static files.
+- [ ] Introduce User Authentication & Team Workspaces.
 
-```bash
-python -u src/agent.py --question "What is a qubit?"
-```
-
-To use a different directory containing `.txt` source documents:
-
-```bash
-python -u src/agent.py --question "What does this source say about X?" --data-dir ./my_sources
-```
-
-## 🧪 Tests
-
-Run the local unit tests:
-
-```bash
-python -m pytest -q
-```
-
-GitHub Actions also runs the test suite automatically on pushes and pull requests.
-
-## 🧪 Challenge Deliverables
-
-- **Question set:** [`questions.md`](questions.md)
-- **Source documents:** [`data/`](data/)
-- **Sample/expected cited answers:** [`sample_outputs.md`](sample_outputs.md)
-- **Core implementation:** [`src/agent.py`](src/agent.py)
-- **Unit tests:** [`tests/test_agent.py`](tests/test_agent.py)
-- **Environment template:** [`.env.example`](.env.example)
-- **CI workflow:** [`.github/workflows/test.yml`](.github/workflows/test.yml)
-
-The three included questions test:
-
-1. Relevant retrieval + citation.
-2. Retrieval across a different source + citation.
-3. A question not answered by the provided sources, where the agent must refuse rather than use outside knowledge.
-
-## 🔎 Retrieval and Tool Approach
-
-1. Every `.txt` file in the selected source directory is read as a source document.
-2. Each document is split into small passages while preserving paragraph boundaries.
-3. ChromaDB creates local embeddings and stores the passages with filename metadata.
-4. A user question is embedded and the most relevant passages are retrieved.
-5. The retrieved passages are inserted into a strict Gemini prompt with explicit source boundaries.
-6. Gemini must answer only from those passages and cite the source filename for factual claims.
-7. The application validates that generated filename citations belong to the retrieved sources and rejects answerable responses that contain no valid citation.
-
-This is deliberately lightweight for a 24-hour challenge. It avoids adding a separate orchestration framework when a small Python pipeline is sufficient.
-
-## ⚖️ Design Tradeoffs and Limitations
-
-- **Why ChromaDB?** It provides a local vector database and local embedding path with minimal application code and no separate embedding API key.
-- **Why Gemini?** It provides the synthesis step while the retrieval context constrains the answer to the supplied sources.
-- **Why passage chunks?** The original implementation indexed one entire file as one chunk. Passage-level chunks make retrieval more precise while keeping the implementation small.
-- **Why filename citations?** They are easy for a reviewer to verify against the supplied source documents. The application also validates that cited filenames were actually retrieved.
-- **Current scope:** The loader supports `.txt` files only. PDF extraction, web search, reranking, and conversational memory are intentionally outside the challenge scope.
-- **Refusal behavior:** If the retrieved evidence is insufficient, the model is instructed to return the exact source-not-found message. Because this is LLM-based, the project keeps the retrieved context explicit and validates citations to reduce unsupported claims.
-- **Model/API note:** The implementation calls Gemini's `generateContent` REST endpoint directly. The model is configurable through `GEMINI_MODEL` and defaults to `gemini-3.6-flash`.
-
-## 📌 Reproducibility
-
-Dependencies are pinned in `requirements.txt`. The repository includes sample source documents, questions, expected behavior, tests, and setup instructions so a reviewer can reproduce the demonstration quickly.
+---
+*Built as a premium AI/ML Engineering Portfolio Project.*
