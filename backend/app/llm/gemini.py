@@ -13,7 +13,7 @@ def generate_with_gemini(prompt: str) -> str:
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{settings.GEMINI_MODEL}:generateContent"
+        f"{settings.GEMINI_MODEL}:generateContent?key={api_key}"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -22,8 +22,7 @@ def generate_with_gemini(prompt: str) -> str:
         url,
         data=json.dumps(payload).encode("utf-8"),
         headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
         },
         method="POST",
     )

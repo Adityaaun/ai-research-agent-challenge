@@ -16,7 +16,7 @@ function App() {
   const handleUploadSuccess = (doc: any) => {
     setDocuments((prev) => [...prev, doc])
   }
-  
+
   const handleStartResearch = () => {
     if (!question.trim()) return
     setActiveQuestion(question)
@@ -35,7 +35,7 @@ function App() {
 
       <header className="border-b border-white/5 bg-background/60 backdrop-blur-md sticky top-0 z-50">
         <div className="container flex h-16 max-w-screen-2xl items-center px-8">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
@@ -47,11 +47,11 @@ function App() {
           </motion.div>
         </div>
       </header>
-      
+
       <main className="flex-1 flex flex-col items-center justify-start p-8 pt-16 z-10 relative">
         <div className="max-w-5xl w-full space-y-12">
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -64,8 +64,8 @@ function App() {
               Decompose questions, retrieve exact evidence, and verify claims with 100% traceabilty.
             </p>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -73,16 +73,16 @@ function App() {
           >
             <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/10 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
             <div className="relative">
-              <input 
-                type="text" 
-                placeholder="What do you want to deeply research?" 
+              <input
+                type="text"
+                placeholder="What do you want to deeply research?"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleStartResearch()}
                 disabled={isResearching}
-                className="flex h-16 w-full rounded-xl border border-white/10 bg-background/80 px-6 py-2 text-lg shadow-2xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50 pr-36 backdrop-blur-xl"
+                className="flex h-16 w-full rounded-xl border border-white/10 bg-background/80 px-6 py-2 text-lg shadow-2xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50 pr-48 backdrop-blur-xl"
               />
-              <button 
+              <button
                 onClick={handleStartResearch}
                 disabled={isResearching}
                 className="absolute right-2 top-2 h-12 px-8 bg-primary text-primary-foreground rounded-lg text-sm font-bold shadow-lg hover:shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
@@ -94,7 +94,7 @@ function App() {
 
           <AnimatePresence mode="wait">
             {isResearching && (
-              <motion.div 
+              <motion.div
                 key="progress"
                 initial={{ opacity: 0, height: 0, y: -20 }}
                 animate={{ opacity: 1, height: 'auto', y: 0 }}
@@ -102,21 +102,21 @@ function App() {
                 className="max-w-3xl mx-auto overflow-hidden"
               >
                 <div className="pt-4">
-                  <ResearchProgress 
-                    question={activeQuestion} 
+                  <ResearchProgress
+                    question={activeQuestion}
                     onComplete={(data) => {
                       setReport(data.report)
                       setClaims(data.claims || [])
                       setEvidence(data.evidence || [])
                       setIsResearching(false)
-                    }} 
+                    }}
                   />
                 </div>
               </motion.div>
             )}
 
             {report && (
-              <motion.div 
+              <motion.div
                 key="results"
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -128,7 +128,7 @@ function App() {
                     <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent rounded-2xl pointer-events-none"></div>
                     <div className="flex justify-between items-start mb-6 border-b border-white/10 pb-4 relative z-10">
                       <h2 className="text-2xl font-bold m-0 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">Research Report</h2>
-                      <button 
+                      <button
                         onClick={() => {
                           const blob = new Blob([report], { type: 'text/markdown' })
                           const url = URL.createObjectURL(blob)
@@ -149,7 +149,7 @@ function App() {
                     <h2 className="text-xl font-bold tracking-tight px-2">Evidence Graph</h2>
                     <div className="shadow-2xl rounded-2xl overflow-hidden border border-white/10 relative">
                       <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none z-10 h-12 bottom-0"></div>
-                      <EvidenceGraph 
+                      <EvidenceGraph
                         question={activeQuestion}
                         claims={claims}
                         evidence={evidence}
@@ -157,7 +157,7 @@ function App() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-6">
                   <h3 className="text-xl font-bold tracking-tight px-2">Verified Claims</h3>
                   <div className="space-y-4">
@@ -167,11 +167,11 @@ function App() {
                       </div>
                     ) : (
                       claims.map((claim, idx) => (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0, x: 20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: idx * 0.1 }}
-                          key={idx} 
+                          key={idx}
                           className="bg-card/40 backdrop-blur-sm border border-white/10 rounded-2xl p-5 shadow-lg space-y-4 hover:bg-card/60 transition-colors group relative overflow-hidden"
                         >
                           <div className="absolute top-0 left-0 w-1 h-full bg-primary/50 group-hover:bg-primary transition-colors"></div>
@@ -187,11 +187,10 @@ function App() {
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${
-                                  claim.confidence_level === 'high' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                                  claim.confidence_level === 'medium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                                  'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                }`}>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${claim.confidence_level === 'high' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                    claim.confidence_level === 'medium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                      'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                  }`}>
                                   {claim.confidence_level || 'low'}
                                 </span>
                                 <span className="font-mono bg-white/5 border border-white/10 px-2.5 py-1 rounded-md font-medium text-white/80">
@@ -216,7 +215,7 @@ function App() {
             )}
 
             {!isResearching && !report && (
-              <motion.div 
+              <motion.div
                 key="kb"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -231,7 +230,7 @@ function App() {
                 </div>
 
                 {documents.length > 0 && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-3 mt-6 max-w-2xl mx-auto w-full"
