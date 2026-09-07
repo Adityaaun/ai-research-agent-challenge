@@ -11,6 +11,24 @@ logger = logging.getLogger(__name__)
 # In a real distributed system this would be Redis/Memcached.
 _bm25_cache = {}
 
+def invalidate_bm25_cache(workspace_id: str = None):
+    """Invalidate the BM25 cache when the searchable corpus changes.
+    
+    Call this after document upload, chunk addition, or document deletion.
+    If workspace_id is None, clears the entire cache.
+    """
+    global _bm25_cache
+    if workspace_id is None:
+        _bm25_cache.clear()
+        logger.info("BM25 cache fully invalidated.")
+    else:
+        removed = _bm25_cache.pop(workspace_id, None)
+        # Also clear the "global" key since global queries include all workspaces
+        _bm25_cache.pop("global", None)
+        if removed:
+            logger.info(f"BM25 cache invalidated for workspace: {workspace_id}")
+
+
 # Lazy loaded reranker
 _reranker = None
 

@@ -86,6 +86,10 @@ async def upload_document(
         )
         db_doc.status = "indexed"
         db.commit()
+        
+        # Invalidate BM25 cache for this workspace since corpus changed
+        from backend.app.retrieval.hybrid import invalidate_bm25_cache
+        invalidate_bm25_cache(workspace.id)
     except Exception as e:
         db_doc.status = "error"
         db.commit()

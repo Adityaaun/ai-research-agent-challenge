@@ -1,76 +1,96 @@
-# RESEARCHOS: Evidence-First AI Research Intelligence Platform
+# RESEARCHOS — Evidence-First AI Research Agent
 
-RESEARCHOS is a premium, portfolio-level RAG (Retrieval-Augmented Generation) application designed to prevent LLM hallucinations by prioritizing evidence, citations, and algorithmic confidence scoring. 
+RESEARCHOS is a full-stack AI research agent that performs deep, grounded research over custom knowledge bases. It enforces an "evidence-first" pipeline: retrieving, verifying, and citing sources before generating any final report.
 
-Unlike generic ChatGPT clones, RESEARCHOS forces the AI (Gemini) to cite its sources down to the exact chunk and page number, dynamically extracting and cross-referencing factual claims against a hybrid knowledge base.
+## Architecture
 
-## 🚀 Features
+```
+Upload PDF/TXT → Parse & Chunk → Store Metadata (SQLite) → Embed & Index (ChromaDB)
+                                                                    ↓
+User Question → Decompose → Vector Search ──┐
+                            BM25 Search ────┤→ RRF Fusion → CrossEncoder Rerank
+                                            ↓
+                        Claim Extraction → Verification (SUPPORT/CONTRADICT/NEUTRAL)
+                                            ↓
+                        Confidence Scoring → Report Generation → SSE Stream → React UI
+```
 
-# RESEARCHOS - Evidence-First AI Research Agent
+### Retrieval Pipeline
+1. **Hybrid RAG**: Dense vector search (ChromaDB) + sparse lexical search (BM25).
+2. **Reciprocal Rank Fusion (RRF)**: Merges results without score normalization.
+3. **CrossEncoder Reranking**: Re-evaluates candidates using `ms-marco-MiniLM-L-6-v2`.
 
-RESEARCHOS is a production-grade, full-stack AI research agent designed to perform deep, grounded research over custom knowledge bases. It explicitly avoids hallucination by enforcing an "evidence-first" pipeline: retrieving, verifying, and citing sources before generating any final report.
+### Claim Verification
+1. **Extraction Agent**: Extracts factual claims from retrieved evidence.
+2. **Verification Agent**: Cross-references each claim against all passages, labeling as `SUPPORT`, `CONTRADICT`, or `NEUTRAL`.
+3. **Confidence Scoring**: Heuristic algorithm based on support count, reranker relevance scores, and contradiction penalties.
 
-## Architecture & Core Features
-
-*   **Hybrid RAG Pipeline**: Combines dense vector search (ChromaDB + Gemini Embeddings) with sparse lexical search (BM25) to maximize recall across both semantic concepts and exact keywords.
-*   **Reciprocal Rank Fusion (RRF)**: Merges vector and lexical results algorithmically without requiring score normalization.
-*   **CrossEncoder Reranking**: Re-evaluates top hybrid candidates using a lightweight cross-encoder model (`ms-marco-MiniLM-L-6-v2`) to ensure absolute semantic relevance before passing context to the LLM.
-*   **Multi-Agent Claim Verification**: 
-    1. An Extraction Agent extracts factual claims from retrieved evidence.
-    2. A Verification Agent cross-references each claim against *all* retrieved passages, labeling relationships as `SUPPORT`, `CONTRADICT`, or `NEUTRAL`.
-*   **Heuristic Confidence Scoring**: Algorithmically scores claims based on the volume of independent supporting sources, CrossEncoder relevance scores, and heavily penalizes for any contradicting evidence found.
-*   **Server-Sent Events (SSE)**: Streams real-time pipeline progress (Retrieval -> Extraction -> Verification -> Synthesis) directly to the React frontend.
-*   **Interactive React Flow Graph**: Visualizes the relationships between the generated report, the verified claims, and the source documents.
+### Frontend
+- Real-time SSE progress streaming.
+- Interactive React Flow evidence graph.
+- Confidence badges and scoring reasons per claim.
 
 ## Tech Stack
-*   **Backend**: Python, FastAPI, SQLAlchemy, SQLite, ChromaDB, Sentence-Transformers, Google Gemini API
-*   **Frontend**: React, TypeScript, Vite, Tailwind CSS, Framer Motion, React Flow
+- **Backend**: Python, FastAPI, SQLAlchemy, SQLite, ChromaDB, Sentence-Transformers, Google Gemini API
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS, Framer Motion, React Flow
 
 ## Quickstart
 
-### 1. Backend Setup
+### Backend
 ```bash
 cd backend
 python -m venv venv
-source venv/Scripts/activate  # Or venv/bin/activate on Linux/Mac
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 pip install sentence-transformers torch
 ```
 
-Set your API key in `backend/.env`:
+Create `backend/.env`:
 ```
 GEMINI_API_KEY=your_key_here
 ```
 
-Run the backend:
+Run:
 ```bash
+cd ..  # from repo root
 uvicorn backend.app.main:app --reload
 ```
 
-### 2. Frontend Setup
+### Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## Running Evaluations
-To run the automated retrieval evaluation (Recall@5):
+## Testing
+
+```bash
+# From repo root
+PYTHONPATH=. pytest backend/tests/ -v
+```
+
+Test coverage includes:
+- Retrieval: RRF fusion, BM25 cache invalidation, empty results
+- Claims: extraction, verification (SUPPORT/CONTRADICT/NEUTRAL), confidence scoring
+- Pipeline: insufficient evidence, LLM failure, malformed responses
+- Citations: valid/invalid/missing citation detection
+
+## Evaluation
+
 ```bash
 cd backend
 python -m scripts.evaluate_retrieval
 ```
 
-To run unit tests:
-```bash
-cd backend
-pytest tests/
-```
+Evaluates four retrieval configurations: Vector-only, BM25-only, Hybrid RRF, and Hybrid+Reranker. Reports Recall@5, Precision@5, and MRR. Results saved to `retrieval_evaluation.json`.
 
-## 🗺️ Roadmap
-- [ ] Add Multi-Agent debate for contradictory evidence.
-- [ ] Add Web-scraping capabilities to ingest URLs alongside static files.
-- [ ] Introduce User Authentication & Team Workspaces.
+## Limitations
+
+- **No hallucination guarantee**: The system reduces but cannot fully eliminate LLM hallucination. Claims are verified against retrieved evidence, but verification itself uses an LLM.
+- **Evaluation scale**: The curated eval dataset is small. Production systems require larger, domain-specific benchmarks.
+- **Single-model dependency**: All LLM calls go to Gemini. API failures will cascade.
+- **No authentication**: This is a portfolio project, not a multi-tenant production service.
 
 ---
-*Built as a premium AI/ML Engineering Portfolio Project.*
+*Built as an AI/ML Engineering portfolio project demonstrating RAG, hybrid retrieval, cross-encoder reranking, and multi-agent claim verification.*

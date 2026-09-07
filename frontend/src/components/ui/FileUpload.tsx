@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react'
-import { UploadCloud, File as FileIcon, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { UploadCloud, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 interface FileUploadProps {
@@ -56,13 +56,13 @@ export function FileUpload({ onUploadSuccess }: FileUploadProps) {
     }
   }
 
-  const onDrop = useCallback((e: React.DragEvent) => {
+  const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFiles(e.dataTransfer.files)
     }
-  }, [])
+  }
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
 
 interface ResearchProgressProps {
@@ -54,7 +54,7 @@ export function ResearchProgress({ question, onComplete }: ResearchProgressProps
     return () => {
       eventSource.close()
     }
-  }, [question])
+  }, [question, onComplete])
 
   return (
     <div className="bg-card border rounded-xl p-6 shadow-sm space-y-6">

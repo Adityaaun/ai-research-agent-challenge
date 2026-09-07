@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import ReactFlow, { Background, Controls, Position, type Edge, type Node } from 'reactflow'
 import 'reactflow/dist/style.css'
 
