@@ -6,10 +6,10 @@ from backend.app.ingestion.parser import is_safe_url, verify_request
 def test_is_safe_url():
     # Valid URLs
     assert is_safe_url("https://en.wikipedia.org/wiki/Harry_Potter") == True
-    assert is_safe_url("http://example.com/path?q=1") == True
+    assert is_safe_url("http://8.8.8.8/path?q=1") == True
     
     # Invalid schemes
-    assert is_safe_url("ftp://example.com") == False
+    assert is_safe_url("ftp://8.8.8.8") == False
     assert is_safe_url("file:///etc/passwd") == False
     
     # Localhost/Loopback
