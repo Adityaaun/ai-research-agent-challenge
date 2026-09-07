@@ -35,3 +35,24 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     sources: List[dict]
+
+class Citation(BaseModel):
+    source: str
+    page_number: Optional[int] = None
+    chunk_index: int
+    document_id: str
+
+class VerificationResult(BaseModel):
+    evidence_id: str
+    relationship: str
+    reasoning: str
+
+class Claim(BaseModel):
+    claim: str
+    supporting_source_ids: List[str]
+    contradicting_source_ids: List[str]
+
+class ScoredClaim(Claim):
+    confidence: int
+    confidence_level: str
+    reasons: List[str]

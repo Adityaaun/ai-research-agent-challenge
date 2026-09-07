@@ -7,16 +7,20 @@ chroma_client = chromadb.PersistentClient(path=str(settings.CHROMA_DIR))
 collection = chroma_client.get_or_create_collection(name=settings.COLLECTION_NAME)
 MAX_RESULTS = 4
 
-def retrieve(query: str, n_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
+def retrieve(query: str, n_results: int = MAX_RESULTS, where: dict = None) -> List[Dict[str, Any]]:
     """Retrieve the most relevant source passages for a question."""
     if collection.count() == 0:
         return []
     
-    result = collection.query(
-        query_texts=[query],
-        n_results=min(n_results, collection.count()),
-        include=["documents", "metadatas", "distances"],
-    )
+    query_params = {
+        "query_texts": [query],
+        "n_results": min(n_results, collection.count()),
+        "include": ["documents", "metadatas", "distances"]
+    }
+    if where:
+        query_params["where"] = where
+        
+    result = collection.query(**query_params)
     
     documents = result.get("documents", [[]])[0]
     metadatas = result.get("metadatas", [[]])[0]

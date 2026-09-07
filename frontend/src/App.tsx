@@ -176,18 +176,36 @@ function App() {
                         >
                           <div className="absolute top-0 left-0 w-1 h-full bg-primary/50 group-hover:bg-primary transition-colors"></div>
                           <p className="text-sm font-medium leading-relaxed">{claim.claim}</p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-white/10">
-                            <div className="flex space-x-3">
-                              <span className="flex items-center space-x-1 text-emerald-400/90 font-medium bg-emerald-400/10 px-2 py-1 rounded-md">
-                                <span>{claim.supporting_source_ids?.length || 0}</span> <span>Support</span>
-                              </span>
-                              <span className="flex items-center space-x-1 text-rose-400/90 font-medium bg-rose-400/10 px-2 py-1 rounded-md">
-                                <span>{claim.contradicting_source_ids?.length || 0}</span> <span>Conflict</span>
-                              </span>
+                          <div className="flex flex-col space-y-3 pt-3 border-t border-white/10">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <div className="flex space-x-2">
+                                <span className="flex items-center space-x-1 text-emerald-400/90 font-medium bg-emerald-400/10 px-2 py-1 rounded-md">
+                                  <span>{claim.supporting_source_ids?.length || 0}</span> <span>Support</span>
+                                </span>
+                                <span className="flex items-center space-x-1 text-rose-400/90 font-medium bg-rose-400/10 px-2 py-1 rounded-md">
+                                  <span>{claim.contradicting_source_ids?.length || 0}</span> <span>Conflict</span>
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${
+                                  claim.confidence_level === 'high' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                  claim.confidence_level === 'medium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                  'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                }`}>
+                                  {claim.confidence_level || 'low'}
+                                </span>
+                                <span className="font-mono bg-white/5 border border-white/10 px-2.5 py-1 rounded-md font-medium text-white/80">
+                                  {claim.confidence}%
+                                </span>
+                              </div>
                             </div>
-                            <span className="font-mono bg-white/5 border border-white/10 px-2.5 py-1 rounded-md font-medium text-white/80">
-                              {claim.confidence}%
-                            </span>
+                            {claim.reasons && claim.reasons.length > 0 && (
+                              <ul className="text-xs text-white/50 space-y-1 list-disc list-inside bg-black/20 p-2.5 rounded-lg border border-white/5">
+                                {claim.reasons.map((r: string, i: number) => (
+                                  <li key={i}>{r}</li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         </motion.div>
                       ))

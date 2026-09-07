@@ -1,9 +1,13 @@
 import json
-import asyncio
+import logging
 from typing import AsyncGenerator
 from sqlalchemy.orm import Session
 from backend.app.llm import gemini
 from backend.app.retrieval import hybrid
+from backend.app.research import claims
+from backend.app.database import models
+
+logger = logging.getLogger(__name__)
 
 async def decompose_question(question: str) -> list[str]:
     """Decompose a complex research question into smaller sub-questions."""
@@ -14,85 +18,97 @@ Question: {question}
 """
     try:
         response = gemini.generate_with_gemini(prompt)
-        # Strip markdown if model added it
         response = response.strip('`').removeprefix('json').strip()
         sub_questions = json.loads(response)
         if not isinstance(sub_questions, list):
             return [question]
         return sub_questions
-    except Exception:
-        # Fallback if parsing fails
+    except Exception as e:
+        logger.warning(f"Decomposition failed, using original question. Error: {e}")
         return [question]
 
 async def run_deep_research(question: str, workspace_id: str, db: Session) -> AsyncGenerator[str, None]:
     """Orchestrate the deep research pipeline and yield SSE progress events."""
+    session_record = None
     
-    # Step 1: Planning
-    yield json.dumps({"status": "progress", "step": "Planning", "message": "Decomposing research question..."})
-    sub_questions = await decompose_question(question)
-    
-    yield json.dumps({
-        "status": "progress", 
-        "step": "Planning", 
-        "message": f"Generated {len(sub_questions)} sub-questions.",
-        "data": sub_questions
-    })
-    
-    await asyncio.sleep(1) # simulate work for UI
-    
-    # Step 2: Retrieving Evidence
-    yield json.dumps({"status": "progress", "step": "Retrieving evidence", "message": "Querying hybrid search across sources..."})
-    
-    all_evidence = []
-    for sq in sub_questions:
-        results = hybrid.hybrid_search(sq, db, workspace_id, top_k=3)
-        all_evidence.extend(results)
-    
-    # Deduplicate based on id
-    unique_evidence = {f"{item['metadata']['source']}_{item['metadata']['chunk_index']}": item for item in all_evidence}
-    evidence_list = list(unique_evidence.values())
-    
-    yield json.dumps({
-        "status": "progress", 
-        "step": "Retrieving evidence", 
-        "message": f"Retrieved {len(evidence_list)} unique passages."
-    })
-    
-    await asyncio.sleep(1)
-    
-    # Step 3: Reranking (Placeholder for actual reranker logic in later phase)
-    yield json.dumps({"status": "progress", "step": "Reranking", "message": "Ranking evidence by relevance..."})
-    await asyncio.sleep(1)
-    
-    from backend.app.research import claims
-    
-    # Step 4: Extracting Claims
-    yield json.dumps({"status": "progress", "step": "Extracting claims", "message": "Extracting grounded claims from evidence..."})
-    extracted_claims = claims.extract_claims(question, evidence_list)
-    
-    yield json.dumps({
-        "status": "progress", 
-        "step": "Extracting claims", 
-        "message": f"Extracted {len(extracted_claims)} factual claims."
-    })
-    
-    # Step 5 & 6: Checking Contradictions & Calculating Confidence
-    yield json.dumps({"status": "progress", "step": "Checking contradictions", "message": "Scoring evidence strength..."})
-    
-    scored_claims = []
-    for claim in extracted_claims:
-        claim["confidence"] = claims.calculate_confidence(claim)
-        scored_claims.append(claim)
-    
-    await asyncio.sleep(1)
-    
-    # Step 7: Writing Report
-    yield json.dumps({"status": "progress", "step": "Writing report", "message": "Synthesizing final research report..."})
-    
-    # Build a structured payload containing the report, the raw evidence, and the structured claims.
-    context = "\n\n".join([f"--- SOURCE: {item['metadata']['source']} ---\n{item['document']}" for item in evidence_list])
-    
-    prompt = f"""You are an Evidence-First Research Assistant for RESEARCHOS.
+    try:
+        logger.info(f"Starting research session for workspace: {workspace_id}")
+        
+        # Step 1: Planning
+        yield json.dumps({"status": "progress", "step": "Planning", "message": "Decomposing research question..."})
+        sub_questions = await decompose_question(question)
+        
+        yield json.dumps({
+            "status": "progress", 
+            "step": "Planning", 
+            "message": f"Generated {len(sub_questions)} sub-questions.",
+            "data": sub_questions
+        })
+        
+        # Step 2: Retrieving Evidence
+        yield json.dumps({"status": "progress", "step": "Retrieving evidence", "message": "Querying hybrid search across sources..."})
+        
+        all_evidence = []
+        for sq in sub_questions:
+            results = hybrid.hybrid_search(sq, db, workspace_id, top_k=5)
+            all_evidence.extend(results)
+            
+        if not all_evidence:
+            logger.warning("No evidence retrieved across any sub-questions.")
+            yield json.dumps({
+                "status": "complete",
+                "step": "Insufficient Evidence",
+                "report": "Insufficient evidence found to answer this question. Please upload more relevant documents to the knowledge base.",
+                "claims": [],
+                "evidence": []
+            })
+            return
+        
+        # Deduplicate based on id
+        unique_evidence = {item['id']: item for item in all_evidence}
+        evidence_list = list(unique_evidence.values())
+        
+        # Re-sort deduplicated evidence by reranker score (or RRF score)
+        evidence_list = sorted(evidence_list, key=lambda x: x.get("reranker_score", x.get("rrf_score", 0)), reverse=True)[:15]
+        
+        yield json.dumps({
+            "status": "progress", 
+            "step": "Retrieving evidence", 
+            "message": f"Retrieved and reranked {len(evidence_list)} unique passages."
+        })
+        
+        # Step 3: Extracting Claims
+        yield json.dumps({"status": "progress", "step": "Extracting claims", "message": "Extracting grounded claims from evidence..."})
+        extracted_claims = claims.extract_claims(question, evidence_list)
+        
+        if not extracted_claims:
+            logger.warning("Failed to extract any claims from the evidence.")
+            
+        yield json.dumps({
+            "status": "progress", 
+            "step": "Extracting claims", 
+            "message": f"Extracted {len(extracted_claims)} factual claims."
+        })
+        
+        # Step 4: Verification & Confidence
+        yield json.dumps({"status": "progress", "step": "Checking contradictions", "message": "Verifying evidence and scoring confidence..."})
+        
+        scored_claims = []
+        evidence_map = {item['id']: item for item in evidence_list}
+        
+        for claim in extracted_claims:
+            # 1. Ask LLM to explicitly verify relationships
+            verified_claim = claims.verify_claim(claim, evidence_list)
+            # 2. Calculate weighted confidence
+            scored_claim = claims.calculate_confidence(verified_claim, evidence_map)
+            scored_claims.append(scored_claim)
+            
+        # Step 5: Writing Report
+        yield json.dumps({"status": "progress", "step": "Writing report", "message": "Synthesizing final research report..."})
+        
+        context = "\n\n".join([f"--- SOURCE ID: {item['id']} | {item['metadata']['source']} ---\n{item['document']}" for item in evidence_list])
+        
+        prompt = f"""You are an Evidence-First Research Assistant for RESEARCHOS.
 Answer the user's question using ONLY the provided evidence.
 
 Question: {question}
@@ -100,40 +116,52 @@ Question: {question}
 Evidence:
 {context}
 
-Provide a highly structured, professional Markdown report. Do not invent information. Every factual claim must cite a source filename.
+Provide a highly structured, professional Markdown report. Do not invent information. 
+Every factual claim must cite a Source ID using the format [doc_name, chunk_index] when referencing the source ID. For example, if Source ID is "Resume.pdf_12", write [Resume.pdf, chunk 12].
 
 You MUST format your response with the following exact sections:
 # Executive Summary
 (A brief high-level summary of the answer)
 
 # Key Findings
-(Detailed bullet points covering the specifics, citing source files)
+(Detailed bullet points covering the specifics, with explicit citations)
 
 # Limitations & Contradictions
 (Note any conflicting evidence or gaps in the provided sources)
 """
-    try:
-        report = gemini.generate_with_gemini(prompt)
+        try:
+            report = gemini.generate_with_gemini(prompt)
+        except Exception as e:
+            logger.error(f"Report generation failed: {e}")
+            report = f"Failed to generate report: {str(e)}"
+            
+        # Save to Database
+        try:
+            session_record = models.ResearchSession(
+                workspace_id=workspace_id,
+                question=question,
+                report=report,
+                claims_data=json.dumps({"claims": scored_claims, "evidence": evidence_list})
+            )
+            db.add(session_record)
+            db.commit()
+            db.refresh(session_record)
+        except Exception as e:
+            logger.error(f"Database error while saving session: {e}")
+            db.rollback()
+            
+        yield json.dumps({
+            "status": "complete",
+            "step": "Done",
+            "report": report,
+            "claims": scored_claims,
+            "evidence": evidence_list,
+            "session_id": session_record.id if session_record else "error"
+        })
+        
     except Exception as e:
-        report = f"Failed to generate report: {str(e)}"
-        
-    # Save to Database
-    from backend.app.database import models
-    session_record = models.ResearchSession(
-        workspace_id=workspace_id,
-        question=question,
-        report=report,
-        claims_data=json.dumps({"claims": scored_claims, "evidence": evidence_list})
-    )
-    db.add(session_record)
-    db.commit()
-    db.refresh(session_record)
-        
-    yield json.dumps({
-        "status": "complete",
-        "step": "Done",
-        "report": report,
-        "claims": scored_claims,
-        "evidence": evidence_list,
-        "session_id": session_record.id
-    })
+        logger.exception(f"Unhandled error in research pipeline: {e}")
+        yield json.dumps({
+            "status": "error",
+            "message": f"Research pipeline failed: {str(e)}"
+        })

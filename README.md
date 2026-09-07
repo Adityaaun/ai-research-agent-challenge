@@ -6,47 +6,66 @@ Unlike generic ChatGPT clones, RESEARCHOS forces the AI (Gemini) to cite its sou
 
 ## 🚀 Features
 
-*   **Drag-and-Drop Ingestion:** Effortlessly upload `.pdf` and `.txt` files via a sleek, dark-mode React frontend.
-*   **Hybrid Retrieval Engine:** Combines semantic Vector Search (ChromaDB) with lexical keyword matching (BM25) using Reciprocal Rank Fusion (RRF) for unparalleled accuracy.
-*   **Deep Research Orchestration:** Complex user queries are dynamically decomposed into sub-questions. Progress is streamed in real-time to the UI via Server-Sent Events (SSE).
-*   **Algorithmic Claim Engine:** Rather than blindly summarizing, the agent extracts discrete, structured factual claims, algorithmically scoring their confidence based on source density and direct contradictions.
-*   **Interactive Evidence Graph:** Powered by React Flow, a stunning nodal graph visually connects your original question to the generated claims and draws Support/Contradict edges directly to the raw source documents.
-*   **Persistent Research Memory:** Powered by PostgreSQL and SQLAlchemy, every deep dive, extracted claim, and piece of evidence is permanently saved for later review.
-*   **Exportable Briefs:** One-click Markdown export of structured, authoritative research reports (Executive Summary, Findings, Limitations).
+# RESEARCHOS - Evidence-First AI Research Agent
 
-## 🛠️ Architecture
+RESEARCHOS is a production-grade, full-stack AI research agent designed to perform deep, grounded research over custom knowledge bases. It explicitly avoids hallucination by enforcing an "evidence-first" pipeline: retrieving, verifying, and citing sources before generating any final report.
 
-*   **Frontend:** React, Vite, TypeScript, Tailwind CSS, shadcn/ui, React Flow, lucide-react.
-*   **Backend:** Python 3, FastAPI, SQLAlchemy, PostgreSQL.
-*   **AI/ML:** Google Gemini API, ChromaDB (Persistent Vector Store), rank-bm25, sentence-transformers.
+## Architecture & Core Features
 
-## ⚙️ How to Run Locally
+*   **Hybrid RAG Pipeline**: Combines dense vector search (ChromaDB + Gemini Embeddings) with sparse lexical search (BM25) to maximize recall across both semantic concepts and exact keywords.
+*   **Reciprocal Rank Fusion (RRF)**: Merges vector and lexical results algorithmically without requiring score normalization.
+*   **CrossEncoder Reranking**: Re-evaluates top hybrid candidates using a lightweight cross-encoder model (`ms-marco-MiniLM-L-6-v2`) to ensure absolute semantic relevance before passing context to the LLM.
+*   **Multi-Agent Claim Verification**: 
+    1. An Extraction Agent extracts factual claims from retrieved evidence.
+    2. A Verification Agent cross-references each claim against *all* retrieved passages, labeling relationships as `SUPPORT`, `CONTRADICT`, or `NEUTRAL`.
+*   **Heuristic Confidence Scoring**: Algorithmically scores claims based on the volume of independent supporting sources, CrossEncoder relevance scores, and heavily penalizes for any contradicting evidence found.
+*   **Server-Sent Events (SSE)**: Streams real-time pipeline progress (Retrieval -> Extraction -> Verification -> Synthesis) directly to the React frontend.
+*   **Interactive React Flow Graph**: Visualizes the relationships between the generated report, the verified claims, and the source documents.
 
-### 1. Database Setup
-Ensure you have PostgreSQL running. The backend defaults to using a local sqlite database if PostgreSQL is not configured, but for production, set up the `DATABASE_URL` appropriately.
+## Tech Stack
+*   **Backend**: Python, FastAPI, SQLAlchemy, SQLite, ChromaDB, Sentence-Transformers, Google Gemini API
+*   **Frontend**: React, TypeScript, Vite, Tailwind CSS, Framer Motion, React Flow
 
-### 2. Backend Setup
+## Quickstart
+
+### 1. Backend Setup
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+source venv/Scripts/activate  # Or venv/bin/activate on Linux/Mac
 pip install -r requirements.txt
-
-# Export your Gemini API key
-export GEMINI_API_KEY="your-api-key-here"
-
-# Run the FastAPI server
-uvicorn app.main:app --reload --port 8000
+pip install sentence-transformers torch
 ```
 
-### 3. Frontend Setup
+Set your API key in `backend/.env`:
+```
+GEMINI_API_KEY=your_key_here
+```
+
+Run the backend:
+```bash
+uvicorn backend.app.main:app --reload
+```
+
+### 2. Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Navigate to `http://localhost:5173` to experience RESEARCHOS.
+## Running Evaluations
+To run the automated retrieval evaluation (Recall@5):
+```bash
+cd backend
+python -m scripts.evaluate_retrieval
+```
+
+To run unit tests:
+```bash
+cd backend
+pytest tests/
+```
 
 ## 🗺️ Roadmap
 - [ ] Add Multi-Agent debate for contradictory evidence.
