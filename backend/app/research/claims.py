@@ -16,6 +16,7 @@ Given the following research question and retrieved evidence passages, extract t
 Rules:
 1. Extract 1 to 5 distinct, important claims.
 2. Output ONLY a valid JSON array of objects. Do not use markdown blocks.
+3. CRITICAL: DO NOT extract negative claims or statements about missing information (e.g., "X is not mentioned in the evidence"). If a piece of information requested in the question is not present in the evidence, simply ignore it. Only extract positive facts actually found in the text.
 
 JSON Format:
 [
