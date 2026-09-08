@@ -79,6 +79,7 @@ GEMINI_MODEL=gemini-3.6-flash
 DATABASE_URL=sqlite:///./veritas.db
 CHROMA_DIR=./chroma_db
 FRONTEND_URL=https://your-deployed-frontend.vercel.app
+PYTHONPATH=/opt/render/project/src  # CRITICAL for Render deployments
 ```
 Start the application:
 ```bash
