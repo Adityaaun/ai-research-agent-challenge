@@ -159,7 +159,7 @@ def hybrid_search(query: str, db: Session, workspace_id: str = None, top_k: int 
     # 3. Rank Fusion
     fused_results = reciprocal_rank_fusion(vector_results, bm25_results)
     
-    # 4. Reranking
-    reranked_results = cross_encoder_rerank(query, fused_results, top_k=top_k)
+    # 4. Reranking (Disabled to prevent OOM on Render free tier)
+    # reranked_results = cross_encoder_rerank(query, fused_results, top_k=top_k)
     
-    return reranked_results
+    return fused_results[:top_k]
