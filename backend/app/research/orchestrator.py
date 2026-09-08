@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import logging
@@ -18,7 +19,7 @@ Return ONLY a JSON array of strings. No markdown formatting, no explanations.
 Question: {question}
 """
     try:
-        response = gemini.generate_with_gemini(prompt)
+        response = await gemini.generate_with_gemini(prompt)
         response = response.strip('`').removeprefix('json').strip()
         sub_questions = json.loads(response)
         if not isinstance(sub_questions, list):
@@ -64,7 +65,7 @@ async def run_deep_research(question: str, workspace_id: str, db: Session) -> As
         
         all_evidence = []
         for sq in sub_questions:
-            results = hybrid.hybrid_search(sq, db, workspace_id, top_k=20)
+            results = await asyncio.to_thread(hybrid.hybrid_search, sq, db, workspace_id, 20)
             all_evidence.extend(results)
             
         if not all_evidence:
@@ -93,7 +94,7 @@ async def run_deep_research(question: str, workspace_id: str, db: Session) -> As
         
         # Step 3: Extracting Claims
         yield json.dumps({"status": "progress", "step": "Extracting claims", "message": "Extracting grounded claims from evidence..."})
-        extracted_claims = claims.extract_claims(question, evidence_list)
+        extracted_claims = await claims.extract_claims(question, evidence_list)
         
         if not extracted_claims:
             logger.warning("Failed to extract any claims from the evidence.")
@@ -112,7 +113,7 @@ async def run_deep_research(question: str, workspace_id: str, db: Session) -> As
         
         for claim in extracted_claims:
             # 1. Ask LLM to explicitly verify relationships
-            verified_claim = claims.verify_claim(claim, evidence_list)
+            verified_claim = await claims.verify_claim(claim, evidence_list)
             # 2. Calculate weighted confidence
             scored_claim = claims.calculate_confidence(verified_claim, evidence_map)
             scored_claims.append(scored_claim)
@@ -144,7 +145,7 @@ You MUST format your response with the following exact sections:
 (Note any conflicting evidence or gaps in the provided sources)
 """
         try:
-            report = gemini.generate_with_gemini(prompt)
+            report = await gemini.generate_with_gemini(prompt)
         except Exception as e:
             logger.error(f"Report generation failed: {e}")
             report = f"Failed to generate report: {str(e)}"

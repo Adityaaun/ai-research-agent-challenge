@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def extract_claims(question: str, evidence_list: List[Dict]) -> List[Dict]:
+async def extract_claims(question: str, evidence_list: List[Dict]) -> List[Dict]:
     """Extract factual claims from the evidence related to the question."""
     
     context = "\n\n".join([f"--- SOURCE ID: {item['id']} | {item['metadata']['source']} ---\n{item['document']}" for item in evidence_list])
@@ -30,7 +30,7 @@ Evidence Passages:
 {context}
 """
     try:
-        response = gemini.generate_with_gemini(prompt)
+        response = await gemini.generate_with_gemini(prompt)
         response = response.strip('`').removeprefix('json').strip()
         claims = json.loads(response)
         # Ensure we return valid format even if LLM slightly hallucinates schema
@@ -39,7 +39,7 @@ Evidence Passages:
         logger.error(f"Claim extraction failed: {e}")
         return []
 
-def verify_claim(claim: Dict, evidence_list: List[Dict]) -> Dict:
+async def verify_claim(claim: Dict, evidence_list: List[Dict]) -> Dict:
     """Run a dedicated verification pass to check each piece of evidence against the claim."""
     
     context = "\n\n".join([f"--- EVIDENCE ID: {item['id']} ---\n{item['document']}" for item in evidence_list])
@@ -66,7 +66,7 @@ Return ONLY a JSON array of objects matching this exact schema, with no markdown
     contradicting = []
     
     try:
-        response = gemini.generate_with_gemini(prompt)
+        response = await gemini.generate_with_gemini(prompt)
         response = response.strip('`').removeprefix('json').strip()
         verifications = json.loads(response)
         
