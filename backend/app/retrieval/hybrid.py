@@ -65,9 +65,20 @@ def get_bm25_results(query: str, db: Session, workspace_id: str = None, top_k: i
         corpus = [chunk.text_content for chunk in chunks]
         tokenized_corpus = [doc.lower().split() for doc in corpus]
         
+        # Cache plain dictionaries instead of ORM objects to prevent DetachedInstanceError
+        cached_chunks = []
+        for chunk in chunks:
+            cached_chunks.append({
+                "text_content": chunk.text_content,
+                "document_filename": chunk.document.filename,
+                "chunk_index": chunk.chunk_index,
+                "page_number": chunk.page_number,
+                "document_id": chunk.document_id
+            })
+        
         # Build index and cache it with the chunks to map back scores
         bm25 = BM25Okapi(tokenized_corpus)
-        _bm25_cache[cache_key] = {"bm25": bm25, "chunks": chunks}
+        _bm25_cache[cache_key] = {"bm25": bm25, "chunks": cached_chunks}
     
     cached = _bm25_cache[cache_key]
     bm25 = cached["bm25"]
@@ -83,15 +94,15 @@ def get_bm25_results(query: str, db: Session, workspace_id: str = None, top_k: i
     for chunk, score in scored_chunks:
         if score > 0:
             results.append({
-                "document": chunk.text_content,
+                "document": chunk["text_content"],
                 "metadata": {
-                    "source": chunk.document.filename,
-                    "chunk_index": chunk.chunk_index,
-                    "page_number": chunk.page_number,
-                    "document_id": chunk.document_id
+                    "source": chunk["document_filename"],
+                    "chunk_index": chunk["chunk_index"],
+                    "page_number": chunk["page_number"],
+                    "document_id": chunk["document_id"]
                 },
                 "retrieval_score": float(score),
-                "id": f"{chunk.document.filename}_{chunk.chunk_index}"
+                "id": f"{chunk['document_filename']}_{chunk['chunk_index']}"
             })
             
     return results
